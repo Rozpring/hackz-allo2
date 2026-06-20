@@ -13,10 +13,21 @@
 ```sh
 cd web
 npm install
-npm run dev      # デモを起動（ブラウザで下方向フリック＝台パン）
-npm test         # 純ロジックのユニットテスト（vitest）
-npm run build    # dist/table-bang.js（埋め込み用 ES モジュール）を生成
+npm run dev          # PCブラウザで確認（https://localhost:5173、証明書警告は許可）
+npm run dev:phone    # スマホ実機で確認（https://<PCのLAN IP>:5173 を開く。証明書警告→許可）
+npm test             # 純ロジックのユニットテスト（vitest）
+npm run build        # dist/table-bang.js（埋め込み用 ES モジュール）を生成
 ```
+
+### スマホのカメラで「実際の手で台パン」
+
+画面右上の **「📷 カメラで台パン」** を押すと、カメラ映像を背景に MediaPipe Hands で手を検出し、
+**実際に手を振り下ろす＝台パン**になります（手のランドマーク → `SwingDetector`）。
+
+- **HTTPS 必須**: `getUserMedia` はセキュアコンテキストが必要。`npm run dev`/`dev:phone` は自己署名 https で起動する。
+  スマホは PC と同じ Wi‑Fi で `https://<PCのLAN IP>:5173` を開き、証明書警告を許可 → カメラ許可。
+- MediaPipe の wasm/モデルは CDN（jsdelivr / googleapis）から実行時ロード（オフライン不可）。
+- カメラが使えない/拒否時は自動でポインタ操作にフォールバック。
 
 ## 埋め込み方
 
@@ -71,7 +82,9 @@ web/src/
   render3d/
     scene3d.ts         # three.js 描画＋cannon-es 物理（衝撃波インパルス・静止検出・表裏確定・ペア回収）
     cardTexture.ts     # ランク＋スートの表/裏テクスチャ生成
-  component.ts     # <table-bang-game> Web Component（3Dシーン＋ポインタ入力）
+  input/
+    handCamera.ts      # getUserMedia + MediaPipe Hands（手の代表点→SwingDetector）
+  component.ts     # <table-bang-game> Web Component（3Dシーン＋ポインタ/カメラ手検出入力）
   index.ts         # 公開API（自動登録）
 ```
 
@@ -79,8 +92,8 @@ web/src/
 
 - **3D＋物理エンジンでネイティブに近い見た目**（カードが跳ねて回転してめくれる）。ただし RealityKit ではなく three.js+cannon-es による独自実装。
 - **真の AR（机に固定）は非対応**。iPhone Safari は WebXR(immersive-ar) 未対応のため。本 Web 版は固定カメラの仮想盤面＋ポインタ操作。
-- **LiDAR 深度による実速度補正なし**。威力はポインタ速度の正規化値ベース。
-- カメラ＋手検出（MediaPipe Hands）での「実際の手で台パン」は将来の拡張ポイント（`SwingDetector` にそのまま接続可能な設計）。
+- **カメラ＋手検出（MediaPipe Hands）対応済み**。実際の手で台パンできる（iPhone Safari 含む。HTTPS 必須）。ただし 2D ランドマークのため LiDAR のような実距離（高さ）補正はなし。
+- **LiDAR 深度による実速度補正なし**。威力はポインタ/手の画面速度の正規化値ベース。
 - 物理係数（影響半径・インパルス・減衰・静止しきい値）は `scene3d.ts` 冒頭の定数で調整可能（実機/各端末でチューニング前提）。
 
 ## 移植の対応関係（ネイティブ → Web）
@@ -96,4 +109,6 @@ web/src/
 | `CardManager`+`ShockwaveSystem`+`PhysicsSettleObserver` | `render3d/scene3d.ts`（3D物理） / `core/game.ts`（ヘッドレス2D） |
 | `CardEntity`/`CardFace` | `render3d/scene3d.ts` + `render3d/cardTexture.ts` |
 | RealityKit（描画・物理） | three.js（描画）＋ cannon-es（物理） |
-| ARKit/Vision | 固定カメラの仮想盤面 ＋ ポインタ入力（`component.ts`） |
+| Vision（手検出） | MediaPipe Hands（`input/handCamera.ts`） |
+| ARKit（ワールドトラッキング） | 固定カメラの仮想盤面（背景にカメラ映像） |
+| `VisionHandProvider`→`HandSwingDetector` | `handCamera.ts`→`SwingDetector`（同じ接続） |

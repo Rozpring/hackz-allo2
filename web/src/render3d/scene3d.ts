@@ -57,7 +57,7 @@ export class Scene3D {
     private readonly config: GameConfig = defaultConfig,
   ) {
     this.state = new GameState(config);
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.scene.background = new THREE.Color(0x0f2e1c);
 
@@ -88,6 +88,11 @@ export class Scene3D {
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     this.renderer.dispose();
+  }
+
+  /** カメラ映像を背景に透過する（AR風）か、緑の盤面背景にするか。 */
+  setCameraBackground(transparent: boolean): void {
+    this.scene.background = transparent ? null : new THREE.Color(0x0f2e1c);
   }
 
   resize(): void {
