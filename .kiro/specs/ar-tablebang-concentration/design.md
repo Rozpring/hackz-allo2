@@ -130,7 +130,7 @@ TableBangConcentration/
 │   └── FeedbackController.swift      # 触覚(CoreHaptics)+効果音
 └── Support/
     ├── Events.swift                  # TablePunchEvent 等のイベント型
-    └── CoordinateMath.swift          # screen↔plane投影、向き補正、+Y法線→表裏判定ヘルパ
+    └── CoordinateMath.swift          # Vision正規化座標→ARView画面座標(displayTransform)、screen↔plane投影、向き補正、+Y法線→表裏判定ヘルパ
 ```
 
 > カードは `CardEntity` が1責務（1枚の物理ボディ＋表面ローカル+Y）。`CardManager` が集合・状態・配置・床/壁を担う。`HandLandmarkProvider` をprotocol化し、Vision実装を差し替え可能にする（MediaPipe移行余地）。
@@ -219,7 +219,8 @@ sequenceDiagram
 **Responsibilities & Constraints**
 - `ARFrame.capturedImage`(CVPixelBuffer)を入力に、中指MCP（手のひら中心相当）を代表点として返す。
 - 推論は専用シリアルキュー（`.userInitiated`）で実行。`isProcessing` フラグで前フレーム処理中はスキップ（間引き）。
-- 端末向きから `CGImagePropertyOrientation` を算出して `VNImageRequestHandler` に渡す。Vision正規化座標（左下原点）を画面座標（左上原点）へy反転。
+- 端末向きから `CGImagePropertyOrientation` を算出して `VNImageRequestHandler` に渡す。
+- **座標変換（実装難所）**: Vision の出力は正規化座標（左下原点・`capturedImage` のセンサ向き基準）。これを ARView 上の画面座標（UIKit points・左上原点）へ写すには単純な y 反転では不十分で、回転・アスペクト比・クロップを含む `ARFrame.displayTransform(for:viewportSize:)` を適用する必要がある。誤ると台パン中心（raycast 投影元）が大きくズレる。変換ロジックは `CoordinateMath` に集約し純関数としてテスト可能にする。
 - confidence < しきい値の点は破棄し「未検出」とする。
 - カメラ映像は端末外へ送信しない。
 
@@ -461,6 +462,9 @@ struct GameConfig {
     // 盤面/進行
     var pairCount: Int            // 例: 8 (=16枚)
     var gridColumns: Int
+    var cardSize: SIMD3<Float>    // カードの物理寸法[幅, 厚み, 奥行] (m)。薄い箱。例: [0.06, 0.002, 0.09]
+    var cardSpacing: Float        // 格子セル間隔 (m)。カード同士が初期状態で重ならない値
+    var boardInset: Float         // 盤面外周〜不可視壁までの余白 (m)
     var timeLimitSeconds: Int
     var comboMultiplierStep: Float
     static let `default`: GameConfig = .init(/* たたき台値 */)
