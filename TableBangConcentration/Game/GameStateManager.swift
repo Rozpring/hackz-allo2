@@ -25,7 +25,7 @@ final class GameStateManager: ObservableObject {
     }
 
     /// 盤面配置完了 → プレイ開始（タイマ開始, R8-1）。
-    func startPlaying(totalPairs: Int) {
+    func startPlaying() {
         phase = .playing
         remainingSeconds = config.timeLimitSeconds
         score = 0
@@ -38,7 +38,9 @@ final class GameStateManager: ObservableObject {
     }
 
     /// 盤面静止で成立したペア数を反映する。複数同時成立はコンボ倍率を上げる（R6-3, R6-4）。
+    /// プレイ中のみ処理する（タイムアップ/クリア後の不正加算・不正遷移を防ぐ）。
     func onPairsMatched(_ pairCount: Int, remainingPairs: Int) {
+        guard phase == .playing else { return }
         guard pairCount > 0 else {
             combo = 0
             return

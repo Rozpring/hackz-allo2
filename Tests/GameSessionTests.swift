@@ -36,6 +36,11 @@ private final class SpyShockwave: ShockwaveEmitting {
     }
 }
 
+/// 同期ディスパッチ（テストでイベントを即時処理させる）。
+private struct SyncDispatcher: Dispatching {
+    func dispatch(_ work: @escaping () -> Void) { work() }
+}
+
 final class GameSessionTests: XCTestCase {
     private let dt = 0.05
 
@@ -51,27 +56,6 @@ final class GameSessionTests: XCTestCase {
             provider.send(HandSample(screenPoint: CGPoint(x: 0.5, y: y), timestamp: t, confidence: 0.9))
             t += dt
         }
-    }
-
-    private func makeSession(
-        projector: ScreenToWorldProjecting,
-        shockwave: ShockwaveEmitting,
-        cardManager: CardManager,
-        settle: PhysicsSettleObserver,
-        game: GameStateManager,
-        config: GameConfig
-    ) -> GameSession {
-        GameSession(
-            handProvider: MockHandProvider(), // 差し替えは呼び出し側で行うためここではダミー
-            swingDetector: HandSwingDetector(config: config),
-            powerCalculator: PowerCalculator(config: config),
-            projector: projector,
-            shockwave: shockwave,
-            settleObserver: settle,
-            cardManager: cardManager,
-            matchEvaluator: MatchEvaluator(),
-            gameState: game
-        )
     }
 
     func testPunchProjectsAndEmitsShockwaveWithPower() {
@@ -92,10 +76,11 @@ final class GameSessionTests: XCTestCase {
             settleObserver: settle,
             cardManager: cardManager,
             matchEvaluator: MatchEvaluator(),
-            gameState: game
+            gameState: game,
+            dispatcher: SyncDispatcher()
         )
         session.start()
-        game.startPlaying(totalPairs: cardManager.remainingPairs)
+        game.startPlaying()
 
         feedPunch(provider)
 
@@ -122,7 +107,8 @@ final class GameSessionTests: XCTestCase {
             settleObserver: settle,
             cardManager: cardManager,
             matchEvaluator: MatchEvaluator(),
-            gameState: game
+            gameState: game,
+            dispatcher: SyncDispatcher()
         )
         session.start()
         feedPunch(provider)
@@ -148,10 +134,11 @@ final class GameSessionTests: XCTestCase {
             settleObserver: settle,
             cardManager: cardManager,
             matchEvaluator: MatchEvaluator(),
-            gameState: game
+            gameState: game,
+            dispatcher: SyncDispatcher()
         )
         session.start()
-        game.startPlaying(totalPairs: cardManager.remainingPairs)
+        game.startPlaying()
         let initialPairs = cardManager.remainingPairs
 
         // 同一ランクの2枚を表向き姿勢にする（物理結果のシミュレート）

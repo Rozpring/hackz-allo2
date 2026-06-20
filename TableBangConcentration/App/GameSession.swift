@@ -3,6 +3,17 @@ import Combine
 import UIKit
 import ARKit
 
+/// 状態更新を実行するスレッドの抽象。ARKit デリゲートはバックグラウンドのシリアルキューで配信されるため、
+/// `@Published`/RealityKit 更新はメインへホップする。テストでは同期ディスパッチに差し替える。
+protocol Dispatching {
+    func dispatch(_ work: @escaping () -> Void)
+}
+
+/// 本番: メインキューへ非同期ディスパッチ。
+struct MainDispatcher: Dispatching {
+    func dispatch(_ work: @escaping () -> Void) { DispatchQueue.main.async(execute: work) }
+}
+
 /// 台パン1回のフローを1本に結線するオーケストレータ（#30, #31）。
 ///
 /// 手検出サンプル → 振り下ろし速度 → 台パン成立 → 威力算出 → screen→plane 投影 →
@@ -19,6 +30,7 @@ final class GameSession: ARFrameConsuming {
     private let matchEvaluator: MatchEvaluator
     private let gameState: GameStateManager
     private let interfaceOrientationProvider: () -> UIInterfaceOrientation
+    private let dispatcher: Dispatching
 
     private var cancellables: Set<AnyCancellable> = []
 
@@ -32,7 +44,8 @@ final class GameSession: ARFrameConsuming {
         cardManager: CardManaging,
         matchEvaluator: MatchEvaluator,
         gameState: GameStateManager,
-        interfaceOrientationProvider: @escaping () -> UIInterfaceOrientation = { .portrait }
+        interfaceOrientationProvider: @escaping () -> UIInterfaceOrientation = { .portrait },
+        dispatcher: Dispatching = MainDispatcher()
     ) {
         self.handProvider = handProvider
         self.swingDetector = swingDetector
@@ -44,12 +57,15 @@ final class GameSession: ARFrameConsuming {
         self.matchEvaluator = matchEvaluator
         self.gameState = gameState
         self.interfaceOrientationProvider = interfaceOrientationProvider
+        self.dispatcher = dispatcher
     }
 
-    /// 購読を開始する。
+    /// 購読を開始する。ARKit 由来のイベントはメインへホップしてから状態を更新する（HIGH-2）。
     func start() {
         handProvider.samples
-            .sink { [weak self] sample in self?.swingDetector.process(sample) }
+            .sink { [weak self] sample in
+                self?.dispatcher.dispatch { self?.swingDetector.process(sample) }
+            }
             .store(in: &cancellables)
 
         swingDetector.punches
@@ -57,7 +73,7 @@ final class GameSession: ARFrameConsuming {
             .store(in: &cancellables)
 
         settleObserver.boardSettled
-            .sink { [weak self] in self?.handleBoardSettled() }
+            .sink { [weak self] in self?.dispatcher.dispatch { self?.handleBoardSettled() } }
             .store(in: &cancellables)
     }
 

@@ -24,6 +24,7 @@ final class GameEngine: ObservableObject {
 
     private var cancellables: Set<AnyCancellable> = []
     private var timer: AnyCancellable?
+    private var boardAnchor: AnchorEntity?
 
     @Published private(set) var phase: GamePhase = .placing
 
@@ -68,18 +69,22 @@ final class GameEngine: ObservableObject {
     /// 盤面を配置してプレイ開始（タイマ起動, R8-1）。
     /// MVP は中央前方に固定アンカーを置く（平面タップ配置は `scene.placeBoardAnchor` を利用）。
     func placeBoardAndStart() {
+        // 既存アンカーを除去してから再配置（リトライ時のゴーストアンカー累積防止）。
+        if let existing = boardAnchor {
+            scene.arView.scene.removeAnchor(existing)
+        }
         let anchor = AnchorEntity(world: SIMD3<Float>(0, -0.1, -0.5))
         scene.arView.scene.addAnchor(anchor)
+        boardAnchor = anchor
         cardManager.attach(to: anchor)
         cardManager.buildBoard(config: config)
-        gameState.startPlaying(totalPairs: cardManager.remainingPairs)
+        gameState.startPlaying()
         startTimer()
     }
 
-    /// 結果画面からのリトライ（盤面再構築・初期状態へ, R8-4）。
+    /// 結果画面からのリトライ（初期状態へ, R8-4）。盤面再構築は次の `placeBoardAndStart()` で行う。
     func retry() {
         timer?.cancel()
-        cardManager.buildBoard(config: config)
         gameState.retry()
     }
 

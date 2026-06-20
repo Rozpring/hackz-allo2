@@ -88,8 +88,8 @@ final class ARSceneController: NSObject, ARSceneControlling, ARSessionDelegate {
     #endif
 
     // MARK: - ARSessionDelegate
-    // NOTE: ARView 経由の ARSession デリゲートはメインスレッドで配信される前提で
-    // planeSides はメインスレッド限定アクセスとする（バックグラウンド配信になる構成では要 @MainActor 化）。
+    // NOTE: ARSession デリゲートは専用のシリアルキュー（メイン以外）で配信される。
+    // 状態を SwiftUI/RealityKit へ反映する側（GameSession）でメインスレッドへホップする。
 
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         trackingSubject.send(frame.camera.trackingState)
