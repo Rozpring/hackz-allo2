@@ -27,4 +27,8 @@ final class PlanePlacementTests: XCTestCase {
     func testGuidanceTrackingLimitedTakesPriority() {
         XCTAssertEqual(PlacementGuidance.evaluate(planeReady: true, trackingLimited: true), .trackingLimited)
     }
+
+    func testGuidanceTrackingLimitedWinsEvenWithoutPlane() {
+        XCTAssertEqual(PlacementGuidance.evaluate(planeReady: false, trackingLimited: true), .trackingLimited)
+    }
 }

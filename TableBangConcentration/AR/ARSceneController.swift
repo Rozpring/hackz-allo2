@@ -11,6 +11,9 @@ protocol ARSceneControlling: AnyObject {
     var planeReady: AnyPublisher<Bool, Never> { get }
     /// 画面座標を平面のワールド座標へ投影（raycast）。平面外では nil（R4-4）。
     func worldPoint(fromScreen point: CGPoint) -> SIMD3<Float>?
+    /// 指定画面座標を平面投影して盤面アンカーを固定する（R2-1）。投影できなければ nil。
+    @discardableResult
+    func placeBoardAnchor(atScreenPoint point: CGPoint) -> AnchorEntity?
 }
 
 /// ARセッション運用・水平面検出・配置可否通知・screen→plane raycast・盤面アンカー固定（R1-3〜R1-5, R2-1, R2-5, R4-4, R10-3）。
@@ -70,6 +73,7 @@ final class ARSceneController: NSObject, ARSceneControlling, ARSessionDelegate {
         return anchor
     }
 
+    #if DEBUG
     /// デバッグ用: 平面タップなしでカメラ前方に固定アンカーを置く（R2-6）。
     func placeDebugAnchor(distance: Float = 0.5) -> AnchorEntity {
         let anchor = AnchorEntity(world: SIMD3<Float>(0, -0.1, -distance))
@@ -77,8 +81,11 @@ final class ARSceneController: NSObject, ARSceneControlling, ARSessionDelegate {
         boardAnchor = anchor
         return anchor
     }
+    #endif
 
     // MARK: - ARSessionDelegate
+    // NOTE: ARView 経由の ARSession デリゲートはメインスレッドで配信される前提で
+    // planeSides はメインスレッド限定アクセスとする（バックグラウンド配信になる構成では要 @MainActor 化）。
 
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         trackingSubject.send(frame.camera.trackingState)
@@ -102,7 +109,9 @@ final class ARSceneController: NSObject, ARSceneControlling, ARSessionDelegate {
 
     private func updatePlanes(_ anchors: [ARAnchor]) {
         for plane in anchors.compactMap({ $0 as? ARPlaneAnchor }) where plane.alignment == .horizontal {
-            planeSides[plane.identifier] = (plane.planeExtent.width, plane.planeExtent.height)
+            // iOS 16+: planeExtent.height は平面の奥行（depth）を表す。
+            let extent = plane.planeExtent
+            planeSides[plane.identifier] = (width: extent.width, depth: extent.height)
         }
         recomputePlaneReady()
     }

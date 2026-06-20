@@ -17,7 +17,8 @@ final class CameraPermission: CameraPermissionRequesting {
         // 既に確定済みなら現在状態を返す。
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         guard status == .notDetermined else {
-            completion(PermissionGate.state(for: status))
+            // 早期リターンも UI 更新がメインスレッドになるよう揃える。
+            DispatchQueue.main.async { completion(PermissionGate.state(for: status)) }
             return
         }
         AVCaptureDevice.requestAccess(for: .video) { granted in
