@@ -30,24 +30,30 @@ final class VisionHandProvider: HandLandmarkProvider {
     /// 前フレームの推論中は新規フレームをスキップする in-flight ガード（`visionQueue` 上でのみ読み書き）。
     private var isProcessing = false
 
-    init(confidenceThreshold: Float = 0.3) {
+    init(confidenceThreshold: Float = 0.2) {
         self.confidenceThreshold = confidenceThreshold
         let request = VNDetectHumanHandPoseRequest()
         request.maximumHandCount = 1 // 片手持ち・片手で台パンの MVP 前提
         self.request = request
     }
 
-    /// `HandLandmarkProvider`: ARFrame から capturedImage と timestamp を取り出して推論へ渡す。
+    /// `HandLandmarkProvider`: ARFrame から capturedImage・timestamp・LiDAR深度を取り出して推論へ渡す。
     func process(frame: ARFrame, interfaceOrientation: UIInterfaceOrientation) {
         process(
             pixelBuffer: frame.capturedImage,
             timestamp: frame.timestamp,
-            interfaceOrientation: interfaceOrientation
+            interfaceOrientation: interfaceOrientation,
+            depthMap: frame.smoothedSceneDepth?.depthMap ?? frame.sceneDepth?.depthMap
         )
     }
 
     /// ARKit 非依存の推論本体（テスト/差し替えのため CVPixelBuffer ＋ タイムスタンプで受ける）。
-    func process(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, interfaceOrientation: UIInterfaceOrientation) {
+    func process(
+        pixelBuffer: CVPixelBuffer,
+        timestamp: TimeInterval,
+        interfaceOrientation: UIInterfaceOrientation,
+        depthMap: CVPixelBuffer? = nil
+    ) {
         // 前フレーム処理中なら間引く。
         var shouldRun = false
         visionQueue.sync {
@@ -80,12 +86,48 @@ final class VisionHandProvider: HandLandmarkProvider {
 
             // Vision 正規化座標は左下原点 → 画面座標（左上原点）へ y 反転。
             let screenPoint = CoordinateMath.flipY(point.location)
+            let depth = depthMap.flatMap { Self.sampleNearestDepth(in: $0, visionPoint: point.location) }
             let sample = HandSample(
                 screenPoint: screenPoint,
                 timestamp: timestamp,
-                confidence: point.confidence
+                confidence: point.confidence,
+                depth: depth
             )
             self.subject.send(sample)
         }
+    }
+
+    /// 深度マップ（LiDAR, Float32メートル）から手の距離を推定する。
+    /// 手は台パン中カメラ前方の最も近い物体になりやすいため、推定点まわりの窓内の「最も近い有効深度」を採る。
+    /// これにより Vision座標→深度マップ座標の厳密な向き合わせがズレても、手の距離を拾いやすくする。
+    static func sampleNearestDepth(in depthMap: CVPixelBuffer, visionPoint: CGPoint) -> Float? {
+        guard CVPixelBufferGetPixelFormatType(depthMap) == kCVPixelFormatType_DepthFloat32 else { return nil }
+        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(depthMap) else { return nil }
+
+        let width = CVPixelBufferGetWidth(depthMap)
+        let height = CVPixelBufferGetHeight(depthMap)
+        let rowBytes = CVPixelBufferGetBytesPerRow(depthMap)
+
+        // Vision 正規化点（左下原点）を深度マップ（センサ＝横長）座標へおおまかに対応付ける。
+        // 厳密な向き補正は実機チューニングの対象。窓内最小で誤差を吸収する。
+        let cx = Int(min(max(visionPoint.y, 0), 1) * CGFloat(width - 1))
+        let cy = Int(min(max(1 - visionPoint.x, 0), 1) * CGFloat(height - 1))
+        let radius = max(4, width / 12)
+
+        var nearest: Float = .greatestFiniteMagnitude
+        var y = max(0, cy - radius)
+        while y <= min(height - 1, cy + radius) {
+            let row = base.advanced(by: y * rowBytes).assumingMemoryBound(to: Float32.self)
+            var x = max(0, cx - radius)
+            while x <= min(width - 1, cx + radius) {
+                let d = row[x]
+                if d.isFinite, d > 0.1, d < 5.0, d < nearest { nearest = d }
+                x += 1
+            }
+            y += 1
+        }
+        return nearest < .greatestFiniteMagnitude ? nearest : nil
     }
 }

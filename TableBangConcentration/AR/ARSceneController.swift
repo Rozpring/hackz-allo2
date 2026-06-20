@@ -52,6 +52,14 @@ final class ARSceneController: NSObject, ARSceneControlling, ARSessionDelegate {
     func start() {
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal]
+        // 人物（手）オクルージョン: 手前の手より奥のカードを隠す（#58）。対応端末でのみ有効化。
+        if ARWorldTrackingConfiguration.supportsFrameSemantics(.personSegmentationWithDepth) {
+            configuration.frameSemantics.insert(.personSegmentationWithDepth)
+        }
+        // LiDAR シーン深度: 手の実距離を測り、振り下ろし速度を実寸化する（威力の正確化）。
+        if ARWorldTrackingConfiguration.supportsFrameSemantics(.smoothedSceneDepth) {
+            configuration.frameSemantics.insert(.smoothedSceneDepth)
+        }
         arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
     }
 

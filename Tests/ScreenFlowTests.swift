@@ -19,8 +19,7 @@ final class ScreenFlowTests: XCTestCase {
         XCTAssertEqual(ScreenFlow.screen(permission: .authorized, hasStarted: true, phase: .playing), .playing)
     }
 
-    func testResultScreenOnClearOrTimeUp() {
+    func testResultScreenOnClear() {
         XCTAssertEqual(ScreenFlow.screen(permission: .authorized, hasStarted: true, phase: .clear), .result)
-        XCTAssertEqual(ScreenFlow.screen(permission: .authorized, hasStarted: true, phase: .timeUp), .result)
     }
 }

@@ -10,6 +10,15 @@ struct HandSample: Equatable {
     let screenPoint: CGPoint
     let timestamp: TimeInterval
     let confidence: Float
+    /// 手のカメラからの距離 (m, LiDAR深度)。取得できなければ nil（想定距離でフォールバック）。
+    var depth: Float?
+
+    init(screenPoint: CGPoint, timestamp: TimeInterval, confidence: Float, depth: Float? = nil) {
+        self.screenPoint = screenPoint
+        self.timestamp = timestamp
+        self.confidence = confidence
+        self.depth = depth
+    }
 }
 
 /// カメラフレームから手の代表点を供給する抽象。

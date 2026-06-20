@@ -62,6 +62,30 @@ final class HandSwingDetectorTests: XCTestCase {
         XCTAssertNil(second.event, "クールダウン中は成立しないはず")
     }
 
+    func testDetectionGapDuringSwingFinalizesPunch() {
+        // 振り下ろし中に検出が途切れる（叩いた瞬間に手がブレて見失う）→ 再検出時に着地として成立
+        let detector = HandSwingDetector(config: .default)
+        var t = 0.0
+        var y: CGFloat = 0.1
+        for _ in 0..<6 { // 下降してスイング状態に
+            detector.process(.init(screenPoint: CGPoint(x: 0.5, y: y), timestamp: t, confidence: 0.9))
+            t += dt
+            y += 0.5
+        }
+        // 大きなギャップ後に再検出
+        let gap = GameConfig.default.maxSampleGap + 0.1
+        let event = detector.process(.init(screenPoint: CGPoint(x: 0.5, y: y), timestamp: t + gap, confidence: 0.9))
+        XCTAssertNotNil(event, "検出ギャップ＝着地として台パン成立")
+    }
+
+    func testDetectionGapWithoutSwingDoesNotTrigger() {
+        let detector = HandSwingDetector(config: .default)
+        detector.process(.init(screenPoint: CGPoint(x: 0.5, y: 0.5), timestamp: 0, confidence: 0.9))
+        let gap = GameConfig.default.maxSampleGap + 0.1
+        let event = detector.process(.init(screenPoint: CGPoint(x: 0.5, y: 0.5), timestamp: gap, confidence: 0.9))
+        XCTAssertNil(event, "スイングしていなければギャップでも成立しない")
+    }
+
     func testHandLostResetsSwing() {
         let detector = HandSwingDetector(config: .default)
         // 下降のみ流してスイング状態にする

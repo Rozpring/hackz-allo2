@@ -4,23 +4,28 @@ import RealityKit
 
 /// 1枚のトランプ。薄い箱の剛体で、表面をローカル +Y、裏面を −Y に固定する（R2-2, R2-4, R5-4, R7-2）。
 /// 表/伏せは時間では変化せず、物理静止後の `worldUp.y` 符号でのみ確定する（R7-6）。
-final class CardEntity: Entity, HasModel, HasPhysics, RankedCard {
+final class CardEntity: Entity, HasModel, HasPhysics, MatchableCard {
     let rank: Int
+    let suit: Suit
     private(set) var state: CardState
 
     /// 伏せ初期姿勢: 表面ローカル +Y を下に向ける（X軸まわり180°）。
     private static let faceDownOrientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(1, 0, 0))
 
     var isFaceUp: Bool { state == .faceUp }
+    /// 同ランク＋同色で一致（A♠↔A♣, A♥↔A♦）。
+    var matchKey: Int { rank * 2 + (suit.isRed ? 1 : 0) }
 
-    init(rank: Int, config: GameConfig) {
+    init(rank: Int, suit: Suit, config: GameConfig) {
         self.rank = rank
+        self.suit = suit
         self.state = .faceDown
         super.init()
 
+        // カード本体（白い薄箱。側面・厚みを表す）。
         let mesh = MeshResource.generateBox(size: config.cardSize)
-        let material = SimpleMaterial(color: .white, isMetallic: false)
-        self.model = ModelComponent(mesh: mesh, materials: [material])
+        let bodyMaterial = SimpleMaterial(color: .white, isMetallic: false)
+        self.model = ModelComponent(mesh: mesh, materials: [bodyMaterial])
 
         let shape = ShapeResource.generateBox(size: config.cardSize)
         self.collision = CollisionComponent(shapes: [shape])
@@ -28,16 +33,40 @@ final class CardEntity: Entity, HasModel, HasPhysics, RankedCard {
             friction: config.friction,
             restitution: config.restitution
         )
-        self.physicsBody = PhysicsBodyComponent(
+        var body = PhysicsBodyComponent(
             shapes: [shape],
             mass: config.cardMass,
             material: physicsMaterial,
             mode: .dynamic
         )
+        // 減衰でエネルギーを抜き、跳ねたカードが盤外へ飛び続けないようにする（iOS 18+）。
+        if #available(iOS 18.0, *) {
+            body.linearDamping = 0.3
+            body.angularDamping = 0.3
+        }
+        self.physicsBody = body
         self.physicsMotion = PhysicsMotionComponent()
+
+        // 表面（ローカル+Y）・裏面（ローカル-Y）にトランプ柄の薄板を貼る。
+        addFaces(config: config)
 
         // 伏せ初期姿勢を適用。
         self.orientation = Self.faceDownOrientation
+    }
+
+    /// 表面=ランク、裏面=カード裏の模様をカード両面に貼る。
+    private func addFaces(config: GameConfig) {
+        let plane = MeshResource.generatePlane(width: config.cardSize.x, depth: config.cardSize.z)
+        let lift = config.cardSize.y / 2 + 0.0003
+
+        let face = ModelEntity(mesh: plane, materials: [CardFace.faceMaterial(rank: rank, suit: suit)])
+        face.position = SIMD3<Float>(0, lift, 0) // +Y 面（法線 +Y、上から見える）
+        addChild(face)
+
+        let back = ModelEntity(mesh: plane, materials: [CardFace.backMaterial()])
+        back.position = SIMD3<Float>(0, -lift, 0)
+        back.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(1, 0, 0)) // 法線を -Y へ向ける
+        addChild(back)
     }
 
     @available(*, unavailable)

@@ -34,7 +34,7 @@ struct HUDView: View {
 
     private var topBar: some View {
         HStack {
-            label(systemImage: "timer", text: timeString(game.remainingSeconds))
+            label(systemImage: "arrow.triangle.2.circlepath", text: "\(game.turns) ターン")
             Spacer()
             label(systemImage: "star.fill", text: "\(game.score)")
         }
@@ -82,10 +82,5 @@ struct HUDView: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(.black.opacity(0.35), in: Capsule())
         .foregroundStyle(.white)
-    }
-
-    private func timeString(_ seconds: Int) -> String {
-        let s = max(0, seconds)
-        return String(format: "%01d:%02d", s / 60, s % 60)
     }
 }

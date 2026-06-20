@@ -1,12 +1,43 @@
 import Foundation
 
-/// 各ランクちょうど2枚ずつのデッキ（ランク列）を構築する（R2-3, R2-4）。
-/// スートは判定に用いないため、カードはランク(Int)のみで表現する。
+/// トランプのスート。色（赤/黒）でペア判定に用いる。
+enum Suit: CaseIterable, Equatable {
+    case spades   // ♠ 黒
+    case hearts   // ♥ 赤
+    case diamonds // ♦ 赤
+    case clubs    // ♣ 黒
+
+    var symbol: String {
+        switch self {
+        case .spades: return "♠"
+        case .hearts: return "♥"
+        case .diamonds: return "♦"
+        case .clubs: return "♣"
+        }
+    }
+
+    var isRed: Bool { self == .hearts || self == .diamonds }
+}
+
+/// 1枚のカードの論理表現（ランク 0..12 ＋ スート）。
+struct Card: Equatable {
+    let rank: Int
+    let suit: Suit
+
+    /// ペア判定キー: 同ランク＋同色で一致（A♠↔A♣, A♥↔A♦）。各キーはデッキ内にちょうど2枚（26ペア）。
+    var matchKey: Int { rank * 2 + (suit.isRed ? 1 : 0) }
+}
+
+/// 標準52枚デッキ（13ランク×4スート）を構築する。ペアは同ランク＋同色で必ず成立可能（26ペア）。
 enum DeckFactory {
-    /// `pairCount` ペア = `2 * pairCount` 枚。各ランクは 0..<pairCount に一意に対応し、必ず2枚ずつ。
-    static func makeRanks(pairCount: Int, shuffled: Bool = true) -> [Int] {
-        precondition(pairCount > 0, "pairCount must be positive")
-        let ranks = (0..<pairCount).flatMap { [$0, $0] }
-        return shuffled ? ranks.shuffled() : ranks
+    /// ランク数（A,2..10,J,Q,K）。
+    static let rankCount = 13
+
+    /// 13ランク×4スート＝52枚の標準デッキ。
+    static func makeStandardDeck(shuffled: Bool = true) -> [Card] {
+        let deck = Suit.allCases.flatMap { suit in
+            (0..<rankCount).map { rank in Card(rank: rank, suit: suit) }
+        }
+        return shuffled ? deck.shuffled() : deck
     }
 }

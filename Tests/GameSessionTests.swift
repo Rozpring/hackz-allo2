@@ -13,22 +13,6 @@ private final class MockHandProvider: HandLandmarkProvider {
     func send(_ sample: HandSample) { subject.send(sample) }
 }
 
-/// raycast 投影のスパイ（固定ワールド点を返す）。
-private final class SpyProjector: ScreenToWorldProjecting {
-    let world: SIMD3<Float>?
-    private(set) var lastScreenPoint: CGPoint?
-    private(set) var lastNormalizedPoint: CGPoint?
-    init(world: SIMD3<Float>?) { self.world = world }
-    func worldPoint(fromScreen point: CGPoint) -> SIMD3<Float>? {
-        lastScreenPoint = point
-        return world
-    }
-    func worldPoint(fromNormalizedScreen normalizedPoint: CGPoint) -> SIMD3<Float>? {
-        lastNormalizedPoint = normalizedPoint
-        return world
-    }
-}
-
 /// 衝撃波発生のスパイ。
 private final class SpyShockwave: ShockwaveEmitting {
     private(set) var emitCount = 0
@@ -63,20 +47,19 @@ final class GameSessionTests: XCTestCase {
         }
     }
 
-    func testPunchProjectsAndEmitsShockwaveWithPower() {
+    func testPunchEmitsShockwaveAtBoardCenterWithPower() {
         let config = GameConfig.default
         let provider = MockHandProvider()
-        let projector = SpyProjector(world: SIMD3<Float>(1, 0, 2))
         let shock = SpyShockwave()
         let cardManager = CardManager()
         cardManager.buildBoard(config: config)
+        cardManager.root.position = SIMD3<Float>(0.1, -0.86, -0.8) // 机の上に置かれた盤面を再現
         let settle = PhysicsSettleObserver(cardManager: cardManager, config: config)
         let game = GameStateManager(config: config)
         let session = GameSession(
             handProvider: provider,
             swingDetector: HandSwingDetector(config: config),
             powerCalculator: PowerCalculator(config: config),
-            projector: projector,
             shockwave: shock,
             settleObserver: settle,
             cardManager: cardManager,
@@ -90,45 +73,14 @@ final class GameSessionTests: XCTestCase {
         feedPunch(provider)
 
         XCTAssertEqual(shock.emitCount, 1, "台パン成立で衝撃波が1回発生")
-        XCTAssertEqual(shock.lastCenter, SIMD3<Float>(1, 0, 2), "raycast 投影点が衝撃波中心")
+        XCTAssertEqual(shock.lastCenter, cardManager.boardCenterWorld, "衝撃波の中心は盤面（#59: 手raycastではなく盤面中心）")
         XCTAssertGreaterThan(game.lastPower, 0, "威力が算出され記録される")
-        // #59: 台パン中心は正規化座標対応の投影を経由する（生の view 座標投影は使わない）。
-        XCTAssertNotNil(projector.lastNormalizedPoint, "中心投影は worldPoint(fromNormalizedScreen:) を使う")
-        XCTAssertNil(projector.lastScreenPoint, "正規化値を view 座標 raycast へ直渡ししていない")
-        XCTAssertEqual(projector.lastNormalizedPoint?.x, 0.5, "着地点の正規化x が投影へ渡る")
-    }
-
-    func testPunchOffPlaneDoesNotEmit() {
-        let config = GameConfig.default
-        let provider = MockHandProvider()
-        let projector = SpyProjector(world: nil) // 平面外
-        let shock = SpyShockwave()
-        let cardManager = CardManager()
-        cardManager.buildBoard(config: config)
-        let settle = PhysicsSettleObserver(cardManager: cardManager, config: config)
-        let game = GameStateManager(config: config)
-        let session = GameSession(
-            handProvider: provider,
-            swingDetector: HandSwingDetector(config: config),
-            powerCalculator: PowerCalculator(config: config),
-            projector: projector,
-            shockwave: shock,
-            settleObserver: settle,
-            cardManager: cardManager,
-            matchEvaluator: MatchEvaluator(),
-            gameState: game,
-            dispatcher: SyncDispatcher()
-        )
-        session.start()
-        feedPunch(provider)
-
-        XCTAssertEqual(shock.emitCount, 0, "平面外への投影は衝撃波を発生させない（R4-4）")
+        XCTAssertEqual(game.turns, 1, "台パン1回＝1ターン")
     }
 
     func testBoardSettledCollectsMatchedPairAndScores() {
         let config = GameConfig.default
         let provider = MockHandProvider()
-        let projector = SpyProjector(world: SIMD3<Float>(0, 0, 0))
         let shock = SpyShockwave()
         let cardManager = CardManager()
         cardManager.buildBoard(config: config)
@@ -138,7 +90,6 @@ final class GameSessionTests: XCTestCase {
             handProvider: provider,
             swingDetector: HandSwingDetector(config: config),
             powerCalculator: PowerCalculator(config: config),
-            projector: projector,
             shockwave: shock,
             settleObserver: settle,
             cardManager: cardManager,
@@ -150,10 +101,12 @@ final class GameSessionTests: XCTestCase {
         game.startPlaying(totalPairs: cardManager.remainingPairs)
         let initialPairs = cardManager.remainingPairs
 
-        // 同一ランクの2枚を表向き姿勢にする（物理結果のシミュレート）
-        let targetRank = cardManager.cards[0].rank
+        // 同一 matchKey（同ランク＋同色）の2枚を表向き姿勢にする（物理結果のシミュレート）
+        let targetKey = cardManager.cards[0].matchKey
         let upright = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
-        cardManager.cards.filter { $0.rank == targetRank }.forEach { $0.orientation = upright }
+        let pairCards = cardManager.cards.filter { $0.matchKey == targetKey }
+        XCTAssertEqual(pairCards.count, 2)
+        pairCards.forEach { $0.orientation = upright }
 
         // 台パン → 静止確定（boardSettled）
         settle.onShockEmitted()
@@ -163,6 +116,6 @@ final class GameSessionTests: XCTestCase {
 
         XCTAssertEqual(game.score, config.scorePerPair, "成立した1ペア分が加点される")
         XCTAssertEqual(cardManager.remainingPairs, initialPairs - 1, "成立ペアは回収される")
-        XCTAssertFalse(cardManager.cards.contains { $0.rank == targetRank }, "回収ランクは盤面から消える")
+        XCTAssertFalse(cardManager.cards.contains { $0.matchKey == targetKey }, "回収ペアは盤面から消える")
     }
 }

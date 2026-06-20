@@ -23,7 +23,6 @@ final class GameSession: ARFrameConsuming {
     private let handProvider: HandLandmarkProvider
     private let swingDetector: HandSwingDetector
     private let powerCalculator: PowerCalculator
-    private let projector: ScreenToWorldProjecting
     private let shockwave: ShockwaveEmitting
     private let settleObserver: PhysicsSettleObserver
     private let cardManager: CardManaging
@@ -39,7 +38,6 @@ final class GameSession: ARFrameConsuming {
         handProvider: HandLandmarkProvider,
         swingDetector: HandSwingDetector,
         powerCalculator: PowerCalculator,
-        projector: ScreenToWorldProjecting,
         shockwave: ShockwaveEmitting,
         settleObserver: PhysicsSettleObserver,
         cardManager: CardManaging,
@@ -52,7 +50,6 @@ final class GameSession: ARFrameConsuming {
         self.handProvider = handProvider
         self.swingDetector = swingDetector
         self.powerCalculator = powerCalculator
-        self.projector = projector
         self.shockwave = shockwave
         self.settleObserver = settleObserver
         self.cardManager = cardManager
@@ -100,10 +97,12 @@ final class GameSession: ARFrameConsuming {
     private func handlePunch(_ punch: TablePunchEvent) {
         let power = powerCalculator.power(from: punch.peakVelocity)
         gameState.recordPower(power)
-        // punch.screenPoint は VisionHandProvider 由来の正規化座標 [0,1]。
-        // raycast はビューの point 座標を期待するため、正規化対応の投影を使う（#59: 単位不一致の解消）。
-        guard let world = projector.worldPoint(fromNormalizedScreen: punch.screenPoint) else { return }
-        shockwave.emit(at: world, power: power)
+        gameState.incrementTurn() // 1ターン＝台パン1回
+
+        // 衝撃波の中心は盤面そのもの（アンカー位置）にする。
+        // 空中の手の画面位置を raycast すると盤面と無関係な点に当たり、半径内にカードが入らないため（#59 実機ログで確認）。
+        let center = cardManager.boardCenterWorld
+        shockwave.emit(at: center, power: power)
         feedback?.playPunch(power: power)
         settleObserver.onShockEmitted()
     }
