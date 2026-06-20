@@ -26,6 +26,18 @@ enum CoordinateMath {
         CGPoint(x: point.x, y: 1 - point.y)
     }
 
+    /// 正規化画面座標 [0,1]（左上原点）→ ビューの point 座標へ変換する。
+    ///
+    /// `ARView.raycast(from:)` はビューの point 座標（0〜幅 / 0〜高さ）を期待するため、Vision 由来の
+    /// 正規化座標をそのまま渡すとレイがビュー左上隅へ飛び盤面に当たらない（#59 の根因）。本変換で単位を合わせる。
+    ///
+    /// 注: これはアスペクトフィルのクロップを無視するビューサイズ乗算の近似。回転・アスペクト・クロップまで
+    /// 厳密に扱うには `ARFrame.displayTransform(for:viewportSize:)` を適用する（精度向上の follow-up）。
+    /// まずは単位の不一致（正規化↔point）を解消し、台パンが盤面へ作用するようにすることを優先する。
+    static func viewPoint(fromNormalized normalized: CGPoint, viewportSize: CGSize) -> CGPoint {
+        CGPoint(x: normalized.x * viewportSize.width, y: normalized.y * viewportSize.height)
+    }
+
     /// カードのワールド上方向ベクトルから表/伏せを判定（worldUp.y > 0 で表）。
     static func isFaceUp(worldUp: SIMD3<Float>) -> Bool {
         worldUp.y > 0

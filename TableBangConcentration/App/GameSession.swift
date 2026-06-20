@@ -100,7 +100,9 @@ final class GameSession: ARFrameConsuming {
     private func handlePunch(_ punch: TablePunchEvent) {
         let power = powerCalculator.power(from: punch.peakVelocity)
         gameState.recordPower(power)
-        guard let world = projector.worldPoint(fromScreen: punch.screenPoint) else { return }
+        // punch.screenPoint は VisionHandProvider 由来の正規化座標 [0,1]。
+        // raycast はビューの point 座標を期待するため、正規化対応の投影を使う（#59: 単位不一致の解消）。
+        guard let world = projector.worldPoint(fromNormalizedScreen: punch.screenPoint) else { return }
         shockwave.emit(at: world, power: power)
         feedback?.playPunch(power: power)
         settleObserver.onShockEmitted()

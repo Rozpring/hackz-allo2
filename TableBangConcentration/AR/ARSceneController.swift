@@ -7,8 +7,11 @@ import RealityKit
 
 /// 画面座標を平面のワールド座標へ投影する抽象（結線層のテスト容易性のため分離）。
 protocol ScreenToWorldProjecting: AnyObject {
-    /// 画面座標を平面のワールド座標へ投影（raycast）。平面外では nil（R4-4）。
+    /// 画面座標（ビューの point 座標）を平面のワールド座標へ投影（raycast）。平面外では nil（R4-4）。
     func worldPoint(fromScreen point: CGPoint) -> SIMD3<Float>?
+    /// 正規化画面座標 [0,1]（Vision 由来）を平面のワールド座標へ投影する。
+    /// 内部でビューの point 座標へ変換してから raycast する（#59: 単位不一致の解消）。平面外では nil。
+    func worldPoint(fromNormalizedScreen normalizedPoint: CGPoint) -> SIMD3<Float>?
 }
 
 /// ARシーン運用の抽象（差し替え可能）。
@@ -56,7 +59,7 @@ final class ARSceneController: NSObject, ARSceneControlling, ARSessionDelegate {
         arView.session.pause()
     }
 
-    /// 画面座標を既存平面へ raycast 投影する（R4-4）。
+    /// 画面座標（ビューの point 座標）を既存平面へ raycast 投影する（R4-4）。
     func worldPoint(fromScreen point: CGPoint) -> SIMD3<Float>? {
         guard let result = arView.raycast(
             from: point,
@@ -65,6 +68,13 @@ final class ARSceneController: NSObject, ARSceneControlling, ARSessionDelegate {
         ).first else { return nil }
         let t = result.worldTransform.columns.3
         return SIMD3<Float>(t.x, t.y, t.z)
+    }
+
+    /// 正規化画面座標 [0,1] を、ビューの point 座標へ変換してから raycast する（#59）。
+    /// 台パン中心（`VisionHandProvider` 由来の正規化座標）はこちらを使う。
+    func worldPoint(fromNormalizedScreen normalizedPoint: CGPoint) -> SIMD3<Float>? {
+        let viewPoint = CoordinateMath.viewPoint(fromNormalized: normalizedPoint, viewportSize: arView.bounds.size)
+        return worldPoint(fromScreen: viewPoint)
     }
 
     /// 指定画面座標を平面投影して盤面アンカーを固定する（R2-1）。投影できなければ false。
