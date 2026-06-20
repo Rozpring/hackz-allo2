@@ -3,10 +3,10 @@
 ネイティブ iOS 版のゲームロジックを TypeScript へ移植し、**フレームワーク非依存の Web Component** として
 埋め込めるようにしたパッケージ。サーバー不要のクライアントサイド完結（≒ ドロップイン部品）。
 
-- 描画: 2D Canvas（iPhone Safari 含め全ブラウザで動作。WebXR 不要）
-- 入力: ポインタ（マウス/タッチ）の下方向フリック＝台パン（速いほど高威力）
+- 描画/物理: **three.js（3D）＋ cannon-es（物理エンジン）**。台パンでカードが物理で跳ねてめくれる（ネイティブに近い見た目）
+- 入力: ポインタ（マウス/タッチ）の下方向フリック＝台パン（速いほど広く飛ぶ）
 - ルール: 標準52枚（13ランク×4スート）、ペア＝同ランク＋同色（26ペア）、ターン制（全ペアでクリア）
-- ランタイム依存ゼロ（`dist/table-bang.js` 約 4.6KB gzip）
+- iPhone Safari 含め全ブラウザで動作（WebGL。WebXR 不要）。バンドル ≈ 171KB gzip（three/cannon 同梱）
 
 ## 開発・確認
 
@@ -67,16 +67,21 @@ web/src/
     shockwave.ts       # 影響半径・距離減衰
     swingDetector.ts   # 振り下ろし→台パン成立（ギャップ着地・クールダウン）
     gameState.ts       # スコア/コンボ/ターン/勝敗（ターン制）
-    game.ts            # 盤面＋bang→めくれ→ペア回収のオーケストレータ
-  component.ts     # <table-bang-game> Web Component（Canvas描画＋ポインタ入力）
+    game.ts            # ヘッドレス/2D 用の決定論オーケストレータ（テスト・ロジック再利用向け）
+  render3d/
+    scene3d.ts         # three.js 描画＋cannon-es 物理（衝撃波インパルス・静止検出・表裏確定・ペア回収）
+    cardTexture.ts     # ランク＋スートの表/裏テクスチャ生成
+  component.ts     # <table-bang-game> Web Component（3Dシーン＋ポインタ入力）
   index.ts         # 公開API（自動登録）
 ```
 
 ## ネイティブ版との違い・制限
 
-- **真の AR（机に固定）は非対応**。iPhone Safari は WebXR(immersive-ar) 未対応のため。本 Web 版は仮想盤面＋ポインタ操作。
+- **3D＋物理エンジンでネイティブに近い見た目**（カードが跳ねて回転してめくれる）。ただし RealityKit ではなく three.js+cannon-es による独自実装。
+- **真の AR（机に固定）は非対応**。iPhone Safari は WebXR(immersive-ar) 未対応のため。本 Web 版は固定カメラの仮想盤面＋ポインタ操作。
 - **LiDAR 深度による実速度補正なし**。威力はポインタ速度の正規化値ベース。
 - カメラ＋手検出（MediaPipe Hands）での「実際の手で台パン」は将来の拡張ポイント（`SwingDetector` にそのまま接続可能な設計）。
+- 物理係数（影響半径・インパルス・減衰・静止しきい値）は `scene3d.ts` 冒頭の定数で調整可能（実機/各端末でチューニング前提）。
 
 ## 移植の対応関係（ネイティブ → Web）
 
@@ -88,5 +93,7 @@ web/src/
 | `Shockwave` | `core/shockwave.ts` |
 | `HandSwingDetector` | `core/swingDetector.ts` |
 | `GameStateManager` | `core/gameState.ts` |
-| `CardManager`+`ShockwaveSystem`+`GameSession` | `core/game.ts` |
-| ARKit/RealityKit/Vision | 2D Canvas ＋ ポインタ入力（`component.ts`） |
+| `CardManager`+`ShockwaveSystem`+`PhysicsSettleObserver` | `render3d/scene3d.ts`（3D物理） / `core/game.ts`（ヘッドレス2D） |
+| `CardEntity`/`CardFace` | `render3d/scene3d.ts` + `render3d/cardTexture.ts` |
+| RealityKit（描画・物理） | three.js（描画）＋ cannon-es（物理） |
+| ARKit/Vision | 固定カメラの仮想盤面 ＋ ポインタ入力（`component.ts`） |
