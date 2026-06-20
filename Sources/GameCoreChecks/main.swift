@@ -11,5 +11,6 @@ print("=== GameCore Checks ===")
 
 runChecks_4_1()
 runChecks_4_3()
+runChecks_4_4()
 
 finishChecks()

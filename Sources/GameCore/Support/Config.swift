@@ -21,3 +21,15 @@ public protocol SwingConfig {
     /// サンプル間隔がこの秒数を超えたら手検出が途切れたとみなし、進行中の下降状態をリセットする。
     var maxSampleGap: TimeInterval { get }
 }
+
+/// `PowerCalculator` が参照する威力正規化パラメータ。要件 4.2, 4.3。
+public protocol PowerConfig {
+    /// 威力の下限（クランプ後の最小値）。
+    var minPower: Float { get }
+    /// 威力の上限（クランプ後の最大値）。
+    var maxPower: Float { get }
+    /// この速度以下では威力を `minPower` にする（画面正規化座標/秒）。
+    var velocityForMinPower: CGFloat { get }
+    /// この速度以上では威力を `maxPower` にする（画面正規化座標/秒）。
+    var velocityForMaxPower: CGFloat { get }
+}
