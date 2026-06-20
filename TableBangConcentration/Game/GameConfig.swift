@@ -42,6 +42,8 @@ struct GameConfig {
     var minPlaneSide: Float
     var timeLimitSeconds: Int
     var comboMultiplierStep: Float
+    /// 1ペア成立あたりの基礎得点。
+    var scorePerPair: Int
 }
 
 extension GameConfig {
@@ -71,6 +73,7 @@ extension GameConfig {
         boardWallHeight: 0.1,
         minPlaneSide: 0.3,
         timeLimitSeconds: 90,
-        comboMultiplierStep: 0.5
+        comboMultiplierStep: 0.5,
+        scorePerPair: 100
     )
 }

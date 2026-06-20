@@ -5,12 +5,16 @@ import CoreGraphics
 import ARKit
 import RealityKit
 
-/// ARシーン運用の抽象（差し替え可能）。
-protocol ARSceneControlling: AnyObject {
-    var trackingState: AnyPublisher<ARCamera.TrackingState, Never> { get }
-    var planeReady: AnyPublisher<Bool, Never> { get }
+/// 画面座標を平面のワールド座標へ投影する抽象（結線層のテスト容易性のため分離）。
+protocol ScreenToWorldProjecting: AnyObject {
     /// 画面座標を平面のワールド座標へ投影（raycast）。平面外では nil（R4-4）。
     func worldPoint(fromScreen point: CGPoint) -> SIMD3<Float>?
+}
+
+/// ARシーン運用の抽象（差し替え可能）。
+protocol ARSceneControlling: ScreenToWorldProjecting {
+    var trackingState: AnyPublisher<ARCamera.TrackingState, Never> { get }
+    var planeReady: AnyPublisher<Bool, Never> { get }
     /// 指定画面座標を平面投影して盤面アンカーを固定する（R2-1）。投影できなければ nil。
     @discardableResult
     func placeBoardAnchor(atScreenPoint point: CGPoint) -> AnchorEntity?

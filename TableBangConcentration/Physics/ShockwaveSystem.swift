@@ -10,9 +10,14 @@ struct CardImpulse {
     let torque: SIMD3<Float>
 }
 
+/// 衝撃波発生の抽象（結線層でのテスト容易性のため）。
+protocol ShockwaveEmitting {
+    func emit(at center: SIMD3<Float>, power: Float)
+}
+
 /// 威力から影響半径を決め、半径内の各カードへ距離減衰インパルス＋ランダムトルクを与える（R5-1〜R5-5, R5-8）。
 /// 重心オフセット打点・軸ランダムトルク・微小ランダム並進で非決定論的な跳ね・回転を生む。
-struct ShockwaveSystem {
+struct ShockwaveSystem: ShockwaveEmitting {
     let cardManager: CardManaging
     let config: GameConfig
 
