@@ -7,6 +7,12 @@ build/
 .next/
 out/
 
+# Swift / SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+*.xcodeproj/xcuserdata/
+
 # Environment
 .env
 .env.*
