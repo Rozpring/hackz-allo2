@@ -17,9 +17,14 @@ private final class MockHandProvider: HandLandmarkProvider {
 private final class SpyProjector: ScreenToWorldProjecting {
     let world: SIMD3<Float>?
     private(set) var lastScreenPoint: CGPoint?
+    private(set) var lastNormalizedPoint: CGPoint?
     init(world: SIMD3<Float>?) { self.world = world }
     func worldPoint(fromScreen point: CGPoint) -> SIMD3<Float>? {
         lastScreenPoint = point
+        return world
+    }
+    func worldPoint(fromNormalizedScreen normalizedPoint: CGPoint) -> SIMD3<Float>? {
+        lastNormalizedPoint = normalizedPoint
         return world
     }
 }
@@ -87,6 +92,10 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(shock.emitCount, 1, "台パン成立で衝撃波が1回発生")
         XCTAssertEqual(shock.lastCenter, SIMD3<Float>(1, 0, 2), "raycast 投影点が衝撃波中心")
         XCTAssertGreaterThan(game.lastPower, 0, "威力が算出され記録される")
+        // #59: 台パン中心は正規化座標対応の投影を経由する（生の view 座標投影は使わない）。
+        XCTAssertNotNil(projector.lastNormalizedPoint, "中心投影は worldPoint(fromNormalizedScreen:) を使う")
+        XCTAssertNil(projector.lastScreenPoint, "正規化値を view 座標 raycast へ直渡ししていない")
+        XCTAssertEqual(projector.lastNormalizedPoint?.x, 0.5, "着地点の正規化x が投影へ渡る")
     }
 
     func testPunchOffPlaneDoesNotEmit() {
