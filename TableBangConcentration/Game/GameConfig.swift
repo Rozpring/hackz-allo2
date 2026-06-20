@@ -36,6 +36,8 @@ struct GameConfig {
     var cardSpacing: Float
     /// 盤面外周〜不可視壁までの余白 (m)
     var boardInset: Float
+    /// 外周不可視壁の高さ (m)。カードが盤外へ飛び出すのを防ぐ。
+    var boardWallHeight: Float
     var timeLimitSeconds: Int
     var comboMultiplierStep: Float
 }
@@ -64,6 +66,7 @@ extension GameConfig {
         cardSize: SIMD3<Float>(0.06, 0.002, 0.09),
         cardSpacing: 0.08,
         boardInset: 0.05,
+        boardWallHeight: 0.1,
         timeLimitSeconds: 90,
         comboMultiplierStep: 0.5
     )
