@@ -1,0 +1,35 @@
+name: TableBangConcentration
+options:
+  bundleIdPrefix: jp.cyan.tablebang
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  TableBangConcentration:
+    type: application
+    platform: iOS
+    sources:
+      - path: TableBangConcentration
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSCameraUsageDescription: "台パン神経衰弱は、手の動きの検出とAR盤面の表示にカメラを使用します。映像は端末内のみで処理され外部に送信されません。"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        TARGETED_DEVICE_FAMILY: "1"
+  TableBangConcentrationTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: TableBangConcentration
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES

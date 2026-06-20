@@ -23,3 +23,11 @@ npm-debug.log*
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Xcode / xcodegen (project is generated from project.yml via `xcodegen generate`)
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
