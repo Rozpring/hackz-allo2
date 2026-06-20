@@ -16,21 +16,31 @@ final class GameStateManagerTests: XCTestCase {
 
     func testStartPlayingSetsTimerAndPhase() {
         let manager = makeManager(timeLimit: 60)
-        manager.startPlaying()
+        manager.startPlaying(totalPairs: 8)
         XCTAssertEqual(manager.phase, .playing)
         XCTAssertEqual(manager.remainingSeconds, 60)
+        XCTAssertEqual(manager.remainingPairs, 8)
+    }
+
+    func testRemainingPairsTracksMatches() {
+        let manager = makeManager()
+        manager.startPlaying(totalPairs: 8)
+        manager.onPairsMatched(2, remainingPairs: 6)
+        XCTAssertEqual(manager.remainingPairs, 6)
+        manager.onPairsMatched(1, remainingPairs: 5)
+        XCTAssertEqual(manager.remainingPairs, 5)
     }
 
     func testSinglePairScoresBasePoints() {
         let manager = makeManager()
-        manager.startPlaying()
+        manager.startPlaying(totalPairs: 8)
         manager.onPairsMatched(1, remainingPairs: 7)
         XCTAssertEqual(manager.score, 100)
     }
 
     func testMultiplePairsInOneSettleApplyComboMultiplier() {
         let manager = makeManager()
-        manager.startPlaying()
+        manager.startPlaying(totalPairs: 8)
         // 2ペア同時: 倍率 = 1 + (2-1)*0.5 = 1.5 → 2*100*1.5 = 300
         manager.onPairsMatched(2, remainingPairs: 6)
         XCTAssertEqual(manager.score, 300)
@@ -39,7 +49,7 @@ final class GameStateManagerTests: XCTestCase {
 
     func testNoPairResetsCombo() {
         let manager = makeManager()
-        manager.startPlaying()
+        manager.startPlaying(totalPairs: 8)
         manager.onPairsMatched(2, remainingPairs: 6)
         manager.onPairsMatched(0, remainingPairs: 6)
         XCTAssertEqual(manager.combo, 0)
@@ -48,14 +58,14 @@ final class GameStateManagerTests: XCTestCase {
 
     func testClearsWhenNoPairsRemain() {
         let manager = makeManager()
-        manager.startPlaying()
+        manager.startPlaying(totalPairs: 8)
         manager.onPairsMatched(1, remainingPairs: 0)
         XCTAssertEqual(manager.phase, .clear)
     }
 
     func testTimeUpWhenTimerReachesZero() {
         let manager = makeManager(timeLimit: 2)
-        manager.startPlaying()
+        manager.startPlaying(totalPairs: 8)
         manager.tick()
         XCTAssertEqual(manager.phase, .playing)
         manager.tick()
@@ -65,7 +75,7 @@ final class GameStateManagerTests: XCTestCase {
 
     func testTickDoesNotGoNegativeOrOverrideClear() {
         let manager = makeManager(timeLimit: 1)
-        manager.startPlaying()
+        manager.startPlaying(totalPairs: 8)
         manager.onPairsMatched(1, remainingPairs: 0) // clear
         manager.tick()
         XCTAssertEqual(manager.phase, .clear, "クリア後は時間切れに上書きされない")
@@ -74,7 +84,7 @@ final class GameStateManagerTests: XCTestCase {
     func testNoScoreAfterTimeUp() {
         // ゲームオーバー後はフレームが届いてもスコア加算・フェーズ遷移しない（HIGH-1）
         let manager = makeManager(timeLimit: 1)
-        manager.startPlaying()
+        manager.startPlaying(totalPairs: 8)
         manager.tick() // timeUp
         XCTAssertEqual(manager.phase, .timeUp)
         manager.onPairsMatched(2, remainingPairs: 0)
@@ -90,7 +100,7 @@ final class GameStateManagerTests: XCTestCase {
 
     func testRetryResetsState() {
         let manager = makeManager()
-        manager.startPlaying()
+        manager.startPlaying(totalPairs: 8)
         manager.onPairsMatched(2, remainingPairs: 6)
         manager.retry()
         XCTAssertEqual(manager.score, 0)

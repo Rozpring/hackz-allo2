@@ -54,35 +54,28 @@ struct RootView: View {
         }
     }
 
-    // MARK: - プレイ（最小HUD。完全な HUD は #27）
+    // MARK: - プレイ（HUD #27）
 
     private var playingView: some View {
-        ZStack(alignment: .top) {
+        ZStack {
             ARViewContainer(controller: engine.scene)
                 .ignoresSafeArea()
-            HStack {
-                Label("\(engine.gameState.remainingSeconds)s", systemImage: "timer")
-                Spacer()
-                Label("\(engine.gameState.score)", systemImage: "star.fill")
-            }
-            .font(.headline)
-            .padding(12)
-            .background(.ultraThinMaterial)
+            HUDView(
+                game: engine.gameState,
+                isHandDetected: engine.isHandDetected,
+                maxPower: engine.config.maxPower
+            )
         }
     }
 
-    // MARK: - 結果（最小。完全な結果画面は #28）
+    // MARK: - 結果（#28）
 
     private var resultView: some View {
-        VStack(spacing: 16) {
-            Text(engine.gameState.phase == .clear ? "クリア！" : "タイムアップ")
-                .font(.largeTitle.bold())
-            Text("スコア: \(engine.gameState.score)")
-                .font(.title3)
-            Button("もう一度") { engine.retry() }
-                .buttonStyle(.borderedProminent)
-        }
-        .padding(24)
+        ResultView(
+            game: engine.gameState,
+            elapsedSeconds: engine.elapsedSeconds,
+            onRetry: { engine.retry() }
+        )
     }
 
     // MARK: - 権限

@@ -14,6 +14,7 @@ final class GameStateManager: ObservableObject {
     @Published private(set) var score: Int = 0
     @Published private(set) var combo: Int = 0
     @Published private(set) var remainingSeconds: Int
+    @Published private(set) var remainingPairs: Int = 0
     @Published private(set) var lastPower: Float = 0
     @Published private(set) var phase: GamePhase = .placing
 
@@ -24,10 +25,11 @@ final class GameStateManager: ObservableObject {
         self.remainingSeconds = config.timeLimitSeconds
     }
 
-    /// 盤面配置完了 → プレイ開始（タイマ開始, R8-1）。
-    func startPlaying() {
+    /// 盤面配置完了 → プレイ開始（タイマ開始, R8-1）。`totalPairs` は結果画面の残ペア表示に使う。
+    func startPlaying(totalPairs: Int) {
         phase = .playing
         remainingSeconds = config.timeLimitSeconds
+        remainingPairs = totalPairs
         score = 0
         combo = 0
     }
@@ -39,8 +41,9 @@ final class GameStateManager: ObservableObject {
 
     /// 盤面静止で成立したペア数を反映する。複数同時成立はコンボ倍率を上げる（R6-3, R6-4）。
     /// プレイ中のみ処理する（タイムアップ/クリア後の不正加算・不正遷移を防ぐ）。
-    func onPairsMatched(_ pairCount: Int, remainingPairs: Int) {
+    func onPairsMatched(_ pairCount: Int, remainingPairs newRemainingPairs: Int) {
         guard phase == .playing else { return }
+        remainingPairs = newRemainingPairs
         guard pairCount > 0 else {
             combo = 0
             return
@@ -49,7 +52,7 @@ final class GameStateManager: ObservableObject {
         let multiplier = 1 + Float(pairCount - 1) * config.comboMultiplierStep
         score += Int(Float(pairCount * config.scorePerPair) * multiplier)
 
-        if remainingPairs == 0 {
+        if newRemainingPairs == 0 {
             phase = .clear
         }
     }
@@ -68,6 +71,7 @@ final class GameStateManager: ObservableObject {
         score = 0
         combo = 0
         lastPower = 0
+        remainingPairs = 0
         remainingSeconds = config.timeLimitSeconds
         phase = .placing
     }
