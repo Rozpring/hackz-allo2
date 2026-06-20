@@ -43,7 +43,9 @@ struct ShockwaveSystem {
                 Float.random(in: config.impulseJitter, using: &rng),
                 Float.random(in: config.impulseJitter, using: &rng)
             )
-            let impulse = direction * power * falloff + jitter
+            // falloff=0（半径境界上）のカードは不変に保つ。半径内のみ微小 jitter を加える。
+            let scaled = direction * power * falloff
+            let impulse = falloff > 0 ? scaled + jitter : scaled
 
             let torque = SIMD3<Float>(
                 Float.random(in: config.torqueRange, using: &rng),

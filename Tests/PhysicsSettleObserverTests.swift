@@ -30,6 +30,24 @@ final class PhysicsSettleObserverTests: XCTestCase {
         XCTAssertTrue(manager.cards.allSatisfy { $0.physicsBody?.mode == .static })
     }
 
+    func testRearmsAfterFirstSettleForSubsequentPunch() {
+        // R7-3: 後続台パンで再度静止監視が始まり、表のカードが伏せに戻り得る
+        let manager = CardManager()
+        manager.buildBoard(config: .default)
+        let observer = PhysicsSettleObserver(cardManager: manager, config: makeConfig(frames: 1))
+
+        var settledCount = 0
+        observer.boardSettled.sink { settledCount += 1 }.store(in: &cancellables)
+
+        observer.onShockEmitted()
+        observer.update(maxLinearSpeed: 0, maxAngularSpeed: 0)
+        XCTAssertEqual(settledCount, 1)
+
+        observer.onShockEmitted() // 2回目の台パン → 再武装
+        observer.update(maxLinearSpeed: 0, maxAngularSpeed: 0)
+        XCTAssertEqual(settledCount, 2, "2回目の台パンでも静止通知される")
+    }
+
     func testDoesNotNotifyBeforeShock() {
         let manager = CardManager()
         manager.buildBoard(config: .default)

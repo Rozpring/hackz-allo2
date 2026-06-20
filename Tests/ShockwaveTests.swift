@@ -65,9 +65,13 @@ final class ShockwaveTests: XCTestCase {
 
 final class ShockwaveSystemPlanTests: XCTestCase {
     func testStrongerPunchAffectsMoreCards() {
+        // 格子間隔(0.08)に対し、最小半径は1枚程度・最大半径は複数枚をカバーする値に固定
+        var config = GameConfig.default
+        config.radiusForMinPower = 0.05
+        config.radiusForMaxPower = 0.30
         let manager = CardManager()
-        manager.buildBoard(config: .default)
-        let system = ShockwaveSystem(cardManager: manager, config: .default)
+        manager.buildBoard(config: config)
+        let system = ShockwaveSystem(cardManager: manager, config: config)
         let center = manager.cards[0].position
 
         var rng1 = SystemRandomNumberGenerator()

@@ -18,8 +18,9 @@ enum Shockwave {
         return max(0, 1 - distance / radius)
     }
 
-    /// インパルス方向 = 水平外向き単位ベクトル + 上方バイアス。
+    /// インパルス方向 = 水平成分を正規化したベクトルに上方バイアスを加算した合成ベクトル。
     /// カードは平面上にあるため delta の垂直成分は無視し、水平成分のみ正規化する。
+    /// 大きさは sqrt(1 + upwardBias²) となる（意図的に正規化しない）。
     static func direction(delta: SIMD3<Float>, upwardBias: Float) -> SIMD3<Float> {
         let horizontal = SIMD3<Float>(delta.x, 0, delta.z)
         let length = simd.length(horizontal)

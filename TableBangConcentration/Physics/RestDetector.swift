@@ -19,7 +19,7 @@ final class RestDetector {
 
         guard isQuiet else {
             quietFrames = 0
-            hasSettled = false
+            hasSettled = false // 動きが再開したら次の静止確定を受け付けられるよう再武装する
             return false
         }
         guard !hasSettled else { return false }
