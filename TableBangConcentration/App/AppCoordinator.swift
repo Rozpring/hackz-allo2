@@ -9,11 +9,27 @@ enum AppScreen: Equatable {
     case result
 }
 
-/// 画面遷移の単一情報源。
+/// 画面遷移の単一情報源（R8-1, R8-4）。
+/// 権限状態とゲームフェーズから `ScreenFlow` で表示画面を導出する。
 final class AppCoordinator: ObservableObject {
     @Published private(set) var screen: AppScreen = .permission
 
-    func go(to screen: AppScreen) {
-        self.screen = screen
+    private(set) var permission: CameraPermissionState = .notDetermined
+    private(set) var phase: GamePhase = .placing
+
+    /// 権限状態の更新を反映する。
+    func updatePermission(_ state: CameraPermissionState) {
+        permission = state
+        recompute()
+    }
+
+    /// ゲームフェーズの更新を反映する。
+    func updatePhase(_ phase: GamePhase) {
+        self.phase = phase
+        recompute()
+    }
+
+    private func recompute() {
+        screen = ScreenFlow.screen(permission: permission, phase: phase)
     }
 }

@@ -5,12 +5,16 @@ import CoreGraphics
 import ARKit
 import RealityKit
 
-/// ARシーン運用の抽象（差し替え可能）。
-protocol ARSceneControlling: AnyObject {
-    var trackingState: AnyPublisher<ARCamera.TrackingState, Never> { get }
-    var planeReady: AnyPublisher<Bool, Never> { get }
+/// 画面座標を平面のワールド座標へ投影する抽象（結線層のテスト容易性のため分離）。
+protocol ScreenToWorldProjecting: AnyObject {
     /// 画面座標を平面のワールド座標へ投影（raycast）。平面外では nil（R4-4）。
     func worldPoint(fromScreen point: CGPoint) -> SIMD3<Float>?
+}
+
+/// ARシーン運用の抽象（差し替え可能）。
+protocol ARSceneControlling: ScreenToWorldProjecting {
+    var trackingState: AnyPublisher<ARCamera.TrackingState, Never> { get }
+    var planeReady: AnyPublisher<Bool, Never> { get }
     /// 指定画面座標を平面投影して盤面アンカーを固定する（R2-1）。投影できなければ nil。
     @discardableResult
     func placeBoardAnchor(atScreenPoint point: CGPoint) -> AnchorEntity?
@@ -84,8 +88,8 @@ final class ARSceneController: NSObject, ARSceneControlling, ARSessionDelegate {
     #endif
 
     // MARK: - ARSessionDelegate
-    // NOTE: ARView 経由の ARSession デリゲートはメインスレッドで配信される前提で
-    // planeSides はメインスレッド限定アクセスとする（バックグラウンド配信になる構成では要 @MainActor 化）。
+    // NOTE: ARSession デリゲートは専用のシリアルキュー（メイン以外）で配信される。
+    // 状態を SwiftUI/RealityKit へ反映する側（GameSession）でメインスレッドへホップする。
 
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         trackingSubject.send(frame.camera.trackingState)
