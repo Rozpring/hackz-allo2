@@ -5,6 +5,7 @@ export {
   mountTableBangGame,
 } from "./component.js";
 
+export { Scene3D } from "./render3d/scene3d.js";
 export { Game } from "./core/game.js";
 export type { BoardCard, BangResult, CardFacing } from "./core/game.js";
 export { GameState } from "./core/gameState.js";
