@@ -13,5 +13,6 @@ runChecks_4_1()
 runChecks_4_3()
 runChecks_4_4()
 runChecks_6_1()
+runChecks_6_2()
 
 finishChecks()

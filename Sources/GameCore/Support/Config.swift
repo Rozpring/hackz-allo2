@@ -33,3 +33,15 @@ public protocol PowerConfig {
     /// この速度以上では威力を `maxPower` にする（画面正規化座標/秒）。
     var velocityForMaxPower: CGFloat { get }
 }
+
+/// `GameStateManager` が参照するスコア/進行パラメータ。要件 6.3, 6.4, 8.1, 8.5。
+public protocol ScoringConfig {
+    /// 盤面のペア総数（=初期残ペア）。例: 8。
+    var pairCount: Int { get }
+    /// 制限時間（秒）。
+    var timeLimitSeconds: Int { get }
+    /// 1ペア回収あたりの基礎点。
+    var basePairScore: Int { get }
+    /// コンボ1段あたりの倍率増分。multiplier = 1 + comboMultiplierStep * (連続得点回数 - 1)。
+    var comboMultiplierStep: Float { get }
+}
