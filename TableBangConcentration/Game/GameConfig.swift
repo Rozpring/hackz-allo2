@@ -38,6 +38,8 @@ struct GameConfig {
     var boardInset: Float
     /// 外周不可視壁の高さ (m)。カードが盤外へ飛び出すのを防ぐ。
     var boardWallHeight: Float
+    /// 盤面配置に必要な検出平面の最小辺長 (m)（R1-5）。
+    var minPlaneSide: Float
     var timeLimitSeconds: Int
     var comboMultiplierStep: Float
 }
@@ -67,6 +69,7 @@ extension GameConfig {
         cardSpacing: 0.08,
         boardInset: 0.05,
         boardWallHeight: 0.1,
+        minPlaneSide: 0.3,
         timeLimitSeconds: 90,
         comboMultiplierStep: 0.5
     )
