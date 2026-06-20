@@ -38,7 +38,9 @@ struct ShockwaveSystem: ShockwaveEmitting {
         let targets = cardManager.cards(within: radius, of: center)
 
         return targets.map { card in
-            let delta = card.position - center
+            // 中心はワールド座標。カード位置もワールドで揃える（#59: ローカル/ワールド混同の解消）。
+            let worldPos = card.position(relativeTo: nil)
+            let delta = worldPos - center
             let distance = simd.length(delta)
             let falloff = Shockwave.falloff(distance: distance, radius: radius)
             let direction = Shockwave.direction(delta: delta, upwardBias: config.upwardBias)
@@ -49,7 +51,8 @@ struct ShockwaveSystem: ShockwaveEmitting {
                 Float.random(in: config.impulseJitter, using: &rng)
             )
             // falloff=0（半径境界上）のカードは不変に保つ。半径内のみ微小 jitter を加える。
-            let scaled = direction * power * falloff
+            // 威力×減衰を物理インパルス（N·s）へ係数変換（カードが吹っ飛ばない現実的な大きさにする）。
+            let scaled = direction * power * falloff * config.impulseScale
             let impulse = falloff > 0 ? scaled + jitter : scaled
 
             let torque = SIMD3<Float>(
@@ -57,8 +60,9 @@ struct ShockwaveSystem: ShockwaveEmitting {
                 Float.random(in: config.torqueRange, using: &rng),
                 Float.random(in: config.torqueRange, using: &rng)
             )
-            // 重心から水平にわずかにずらした打点。
-            let offset = SIMD3<Float>(
+            // 重心から水平にわずかにずらしたワールド打点（非決定論的な回転を生む）。
+            // applyImpulse(at:relativeTo: nil) はワールド点を期待するため worldPos 基準にする。
+            let offset = worldPos + SIMD3<Float>(
                 Float.random(in: config.impulseJitter, using: &rng),
                 0,
                 Float.random(in: config.impulseJitter, using: &rng)

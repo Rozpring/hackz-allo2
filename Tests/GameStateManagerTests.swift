@@ -2,9 +2,8 @@ import XCTest
 @testable import TableBangConcentration
 
 final class GameStateManagerTests: XCTestCase {
-    private func makeManager(timeLimit: Int = 90) -> GameStateManager {
+    private func makeManager() -> GameStateManager {
         var config = GameConfig.default
-        config.timeLimitSeconds = timeLimit
         config.scorePerPair = 100
         config.comboMultiplierStep = 0.5
         return GameStateManager(config: config)
@@ -14,12 +13,26 @@ final class GameStateManagerTests: XCTestCase {
         XCTAssertEqual(makeManager().phase, .placing)
     }
 
-    func testStartPlayingSetsTimerAndPhase() {
-        let manager = makeManager(timeLimit: 60)
+    func testStartPlayingResetsTurnsAndPhase() {
+        let manager = makeManager()
         manager.startPlaying(totalPairs: 8)
         XCTAssertEqual(manager.phase, .playing)
-        XCTAssertEqual(manager.remainingSeconds, 60)
+        XCTAssertEqual(manager.turns, 0)
         XCTAssertEqual(manager.remainingPairs, 8)
+    }
+
+    func testIncrementTurnCountsBangs() {
+        let manager = makeManager()
+        manager.startPlaying(totalPairs: 8)
+        manager.incrementTurn()
+        manager.incrementTurn()
+        XCTAssertEqual(manager.turns, 2)
+    }
+
+    func testIncrementTurnIgnoredBeforePlaying() {
+        let manager = makeManager()
+        manager.incrementTurn() // placing 中は無視
+        XCTAssertEqual(manager.turns, 0)
     }
 
     func testRemainingPairsTracksMatches() {
@@ -63,33 +76,16 @@ final class GameStateManagerTests: XCTestCase {
         XCTAssertEqual(manager.phase, .clear)
     }
 
-    func testTimeUpWhenTimerReachesZero() {
-        let manager = makeManager(timeLimit: 2)
-        manager.startPlaying(totalPairs: 8)
-        manager.tick()
-        XCTAssertEqual(manager.phase, .playing)
-        manager.tick()
-        XCTAssertEqual(manager.remainingSeconds, 0)
-        XCTAssertEqual(manager.phase, .timeUp)
-    }
-
-    func testTickDoesNotGoNegativeOrOverrideClear() {
-        let manager = makeManager(timeLimit: 1)
-        manager.startPlaying(totalPairs: 8)
+    func testNoScoreOrTurnAfterClear() {
+        // クリア後はフレームが届いても加点・ターン加算しない
+        let manager = makeManager()
+        manager.startPlaying(totalPairs: 1)
         manager.onPairsMatched(1, remainingPairs: 0) // clear
-        manager.tick()
-        XCTAssertEqual(manager.phase, .clear, "クリア後は時間切れに上書きされない")
-    }
-
-    func testNoScoreAfterTimeUp() {
-        // ゲームオーバー後はフレームが届いてもスコア加算・フェーズ遷移しない（HIGH-1）
-        let manager = makeManager(timeLimit: 1)
-        manager.startPlaying(totalPairs: 8)
-        manager.tick() // timeUp
-        XCTAssertEqual(manager.phase, .timeUp)
+        manager.incrementTurn()
         manager.onPairsMatched(2, remainingPairs: 0)
-        XCTAssertEqual(manager.score, 0, "タイムアップ後は加点されない")
-        XCTAssertEqual(manager.phase, .timeUp, "タイムアップからクリアへ不正遷移しない")
+        XCTAssertEqual(manager.phase, .clear)
+        XCTAssertEqual(manager.turns, 0, "クリア後はターン加算しない")
+        XCTAssertEqual(manager.score, 100, "クリア後は加点しない")
     }
 
     func testRecordPowerUpdatesLastPower() {
@@ -101,10 +97,12 @@ final class GameStateManagerTests: XCTestCase {
     func testRetryResetsState() {
         let manager = makeManager()
         manager.startPlaying(totalPairs: 8)
+        manager.incrementTurn()
         manager.onPairsMatched(2, remainingPairs: 6)
         manager.retry()
         XCTAssertEqual(manager.score, 0)
         XCTAssertEqual(manager.combo, 0)
+        XCTAssertEqual(manager.turns, 0)
         XCTAssertEqual(manager.phase, .placing)
     }
 }

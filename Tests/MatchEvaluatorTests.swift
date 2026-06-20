@@ -1,11 +1,11 @@
 import XCTest
 @testable import TableBangConcentration
 
-private final class MockCard: RankedCard {
-    let rank: Int
+private final class MockCard: MatchableCard {
+    let matchKey: Int
     var isFaceUp: Bool
-    init(_ rank: Int, faceUp: Bool) {
-        self.rank = rank
+    init(_ matchKey: Int, faceUp: Bool) {
+        self.matchKey = matchKey
         self.isFaceUp = faceUp
     }
 }
@@ -34,10 +34,16 @@ final class MatchEvaluatorTests: XCTestCase {
         XCTAssertTrue(evaluator.findPairs(faceUp: cards).isEmpty)
     }
 
-    func testPairConsistsOfSameRank() {
+    func testPairConsistsOfSameMatchKey() {
         let cards = [MockCard(7, faceUp: true), MockCard(7, faceUp: true)]
         let pairs = evaluator.findPairs(faceUp: cards)
         XCTAssertEqual(pairs.count, 1)
-        XCTAssertEqual(Set(pairs[0].map(\.rank)), [7])
+        XCTAssertEqual(Set(pairs[0].map(\.matchKey)), [7])
+    }
+
+    func testDifferentKeySameRankIsNotPair() {
+        // 同ランクでも色違い（matchKey 異なる）は成立しない
+        let cards = [MockCard(10, faceUp: true), MockCard(11, faceUp: true)]
+        XCTAssertTrue(evaluator.findPairs(faceUp: cards).isEmpty)
     }
 }

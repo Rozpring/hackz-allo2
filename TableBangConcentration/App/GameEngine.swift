@@ -18,7 +18,6 @@ final class GameEngine: ObservableObject {
     private let session: GameSession
 
     private var cancellables: Set<AnyCancellable> = []
-    private var timer: AnyCancellable?
     private var boardAnchor: AnchorEntity?
 
     @Published private(set) var phase: GamePhase = .placing
@@ -26,9 +25,6 @@ final class GameEngine: ObservableObject {
     @Published private(set) var isHandDetected: Bool = false
     /// 配置可能な水平面を検出済みか（配置ガイド表示に使う, R1-5）。
     @Published private(set) var isPlaneReady: Bool = false
-
-    /// クリア時の経過秒数（結果画面に渡す）。
-    var elapsedSeconds: Int { config.timeLimitSeconds - gameState.remainingSeconds }
 
     init(config: GameConfig = .default) {
         self.config = config
@@ -43,7 +39,6 @@ final class GameEngine: ObservableObject {
             handProvider: handProvider,
             swingDetector: swingDetector,
             powerCalculator: PowerCalculator(config: config),
-            projector: scene,
             shockwave: ShockwaveSystem(cardManager: cardManager, config: config),
             settleObserver: settleObserver,
             cardManager: cardManager,
@@ -87,7 +82,9 @@ final class GameEngine: ObservableObject {
     /// 平面が取れなければ何もせず false を返す（配置ガイドで誘導, R1-4）。
     @discardableResult
     func placeBoard(atScreenPoint point: CGPoint) -> Bool {
-        guard let anchor = scene.placeBoardAnchor(atScreenPoint: point) else { return false }
+        guard let anchor = scene.placeBoardAnchor(atScreenPoint: point) else {
+            return false
+        }
         installBoard(on: anchor)
         return true
     }
@@ -111,22 +108,14 @@ final class GameEngine: ObservableObject {
         cardManager.attach(to: anchor)
         cardManager.buildBoard(config: config)
         gameState.startPlaying(totalPairs: cardManager.remainingPairs)
-        startTimer()
     }
 
     /// リトライ／中断やり直し（初期状態＝配置画面へ, R8-4）。盤面を撤去し、次のタップ配置で組み直す。
     func retry() {
-        timer?.cancel()
         if let existing = boardAnchor {
             scene.arView.scene.removeAnchor(existing)
             boardAnchor = nil
         }
         gameState.retry()
-    }
-
-    private func startTimer() {
-        timer = Timer.publish(every: 1, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in self?.gameState.tick() }
     }
 }

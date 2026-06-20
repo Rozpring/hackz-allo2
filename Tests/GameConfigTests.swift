@@ -5,8 +5,7 @@ import simd
 final class GameConfigTests: XCTestCase {
     func testDefaultIsConsistent() {
         let c = GameConfig.default
-        XCTAssertEqual(c.pairCount, 8)
-        XCTAssertEqual(c.gridColumns, 4)
+        XCTAssertGreaterThan(c.gridColumns, 0)
         XCTAssertLessThan(c.minPower, c.maxPower)
         XCTAssertGreaterThan(c.radiusForMaxPower, c.radiusForMinPower)
         XCTAssertGreaterThan(c.velocityForMaxPower, c.swingVelocityThreshold)

@@ -8,7 +8,7 @@ enum ScreenFlow {
         switch phase {
         case .placing: return .placing
         case .playing: return .playing
-        case .clear, .timeUp: return .result
+        case .clear: return .result
         }
     }
 }

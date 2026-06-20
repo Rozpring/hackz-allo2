@@ -66,12 +66,10 @@ struct RootView: View {
 
     private var placingView: some View {
         ZStack(alignment: .bottom) {
-            ARViewContainer(controller: engine.scene)
-                .ignoresSafeArea()
-                .gesture(
-                    SpatialTapGesture(coordinateSpace: .local)
-                        .onEnded { value in engine.placeBoard(atScreenPoint: value.location) }
-                )
+            ARViewContainer(controller: engine.scene, onTap: { point in
+                engine.placeBoard(atScreenPoint: point)
+            })
+            .ignoresSafeArea()
             VStack(spacing: 12) {
                 Text(engine.isPlaneReady
                      ? "平面をタップして盤面を配置してください"
@@ -116,7 +114,6 @@ struct RootView: View {
     private var resultView: some View {
         ResultView(
             game: engine.gameState,
-            elapsedSeconds: engine.elapsedSeconds,
             onRetry: { engine.retry() }
         )
     }

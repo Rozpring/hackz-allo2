@@ -9,6 +9,8 @@ protocol CardManaging: AnyObject {
     func cards(within radius: Float, of center: SIMD3<Float>) -> [CardEntity]
     func collect(_ cards: [CardEntity])
     var remainingPairs: Int { get }
+    /// 盤面の中心（ルートのワールド座標）。台パンの衝撃波中心に用いる。
+    var boardCenterWorld: SIMD3<Float> { get }
 }
 
 /// デッキ生成・格子配置・床/壁コライダー設置・半径内抽出・回収除去・残ペア管理を担う。
@@ -36,27 +38,30 @@ final class CardManager: CardManaging {
         cards = []
         boundaries = []
 
-        let ranks = DeckFactory.makeRanks(pairCount: config.pairCount)
+        let deck = DeckFactory.makeStandardDeck()
         let positions = BoardLayout.gridPositions(
-            count: ranks.count,
+            count: deck.count,
             columns: config.gridColumns,
             spacing: config.cardSpacing
         )
 
-        for (rank, position) in zip(ranks, positions) {
-            let card = CardEntity(rank: rank, config: config)
-            card.position = position
-            root.addChild(card)
-            cards.append(card)
+        for (card, position) in zip(deck, positions) {
+            let entity = CardEntity(rank: card.rank, suit: card.suit, config: config)
+            entity.position = position
+            root.addChild(entity)
+            cards.append(entity)
         }
 
         boundaries = makeBoundaries(for: positions, config: config)
         boundaries.forEach { root.addChild($0) }
     }
 
+    /// 中心 `center` はワールド座標（raycast 由来）。カードはアンカー配下に置かれるため、
+    /// 比較もワールド座標（`position(relativeTo: nil)`）で行う（#59: ローカル/ワールド混同の解消）。
     func cards(within radius: Float, of center: SIMD3<Float>) -> [CardEntity] {
         cards.filter { card in
-            card.state != .collected && simd.distance(card.position, center) <= radius
+            card.state != .collected
+                && simd.distance(card.position(relativeTo: nil), center) <= radius
         }
     }
 
@@ -67,6 +72,10 @@ final class CardManager: CardManaging {
 
     var remainingPairs: Int {
         cards.filter { $0.state != .collected }.count / 2
+    }
+
+    var boardCenterWorld: SIMD3<Float> {
+        root.position(relativeTo: nil)
     }
 
     // MARK: - Private
@@ -81,26 +90,30 @@ final class CardManager: CardManaging {
         let halfWidth = maxX + config.cardSize.x / 2 + config.boardInset
         let halfDepth = maxZ + config.cardSize.z / 2 + config.boardInset
         let wallHeight = config.boardWallHeight
+        let wallThickness: Float = 0.02 // 薄壁だと高速カードが貫通するため厚みを持たせる
+        let floorThickness: Float = 0.1
         let cardHalfThickness = config.cardSize.y / 2
 
+        // 床は盤面より十分大きく・厚くして、跳ねたカードが床外/床下（奈落）へ抜けないようにする。
+        let floorTopY = -cardHalfThickness
         let floor = makeStatic(
-            size: SIMD3<Float>(halfWidth * 2, 0.002, halfDepth * 2),
-            at: SIMD3<Float>(0, -cardHalfThickness, 0)
+            size: SIMD3<Float>(halfWidth * 2 + 1.0, floorThickness, halfDepth * 2 + 1.0),
+            at: SIMD3<Float>(0, floorTopY - floorThickness / 2, 0)
         )
         let left = makeStatic(
-            size: SIMD3<Float>(0.002, wallHeight, halfDepth * 2),
+            size: SIMD3<Float>(wallThickness, wallHeight, halfDepth * 2),
             at: SIMD3<Float>(-halfWidth, wallHeight / 2, 0)
         )
         let right = makeStatic(
-            size: SIMD3<Float>(0.002, wallHeight, halfDepth * 2),
+            size: SIMD3<Float>(wallThickness, wallHeight, halfDepth * 2),
             at: SIMD3<Float>(halfWidth, wallHeight / 2, 0)
         )
         let near = makeStatic(
-            size: SIMD3<Float>(halfWidth * 2, wallHeight, 0.002),
+            size: SIMD3<Float>(halfWidth * 2, wallHeight, wallThickness),
             at: SIMD3<Float>(0, wallHeight / 2, halfDepth)
         )
         let far = makeStatic(
-            size: SIMD3<Float>(halfWidth * 2, wallHeight, 0.002),
+            size: SIMD3<Float>(halfWidth * 2, wallHeight, wallThickness),
             at: SIMD3<Float>(0, wallHeight / 2, -halfDepth)
         )
         return [floor, left, right, near, far]
