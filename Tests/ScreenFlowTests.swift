@@ -3,20 +3,24 @@ import XCTest
 
 final class ScreenFlowTests: XCTestCase {
     func testPermissionScreenWhenNotAuthorized() {
-        XCTAssertEqual(ScreenFlow.screen(permission: .notDetermined, phase: .placing), .permission)
-        XCTAssertEqual(ScreenFlow.screen(permission: .denied, phase: .playing), .permission)
+        XCTAssertEqual(ScreenFlow.screen(permission: .notDetermined, hasStarted: false, phase: .placing), .permission)
+        XCTAssertEqual(ScreenFlow.screen(permission: .denied, hasStarted: true, phase: .playing), .permission)
     }
 
-    func testPlacingScreenWhenAuthorizedAndPlacing() {
-        XCTAssertEqual(ScreenFlow.screen(permission: .authorized, phase: .placing), .placing)
+    func testTitleScreenWhenAuthorizedButNotStarted() {
+        XCTAssertEqual(ScreenFlow.screen(permission: .authorized, hasStarted: false, phase: .placing), .title)
+    }
+
+    func testPlacingScreenAfterStart() {
+        XCTAssertEqual(ScreenFlow.screen(permission: .authorized, hasStarted: true, phase: .placing), .placing)
     }
 
     func testPlayingScreen() {
-        XCTAssertEqual(ScreenFlow.screen(permission: .authorized, phase: .playing), .playing)
+        XCTAssertEqual(ScreenFlow.screen(permission: .authorized, hasStarted: true, phase: .playing), .playing)
     }
 
     func testResultScreenOnClearOrTimeUp() {
-        XCTAssertEqual(ScreenFlow.screen(permission: .authorized, phase: .clear), .result)
-        XCTAssertEqual(ScreenFlow.screen(permission: .authorized, phase: .timeUp), .result)
+        XCTAssertEqual(ScreenFlow.screen(permission: .authorized, hasStarted: true, phase: .clear), .result)
+        XCTAssertEqual(ScreenFlow.screen(permission: .authorized, hasStarted: true, phase: .timeUp), .result)
     }
 }

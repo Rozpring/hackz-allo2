@@ -24,6 +24,8 @@ final class GameEngine: ObservableObject {
     @Published private(set) var phase: GamePhase = .placing
     /// 手検出の有無（HUD の補助ガイド表示に使う, 要件 9.4）。
     @Published private(set) var isHandDetected: Bool = false
+    /// 配置可能な水平面を検出済みか（配置ガイド表示に使う, R1-5）。
+    @Published private(set) var isPlaneReady: Bool = false
 
     /// クリア時の経過秒数（結果画面に渡す）。
     var elapsedSeconds: Int { config.timeLimitSeconds - gameState.remainingSeconds }
@@ -73,17 +75,38 @@ final class GameEngine: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.isHandDetected = true }
             .store(in: &cancellables)
+
+        // 配置可能な平面検出を配置ガイドへ反映（R1-5）。
+        scene.planeReady
+            .receive(on: RunLoop.main)
+            .sink { [weak self] ready in self?.isPlaneReady = ready }
+            .store(in: &cancellables)
     }
 
-    /// 盤面を配置してプレイ開始（タイマ起動, R8-1）。
-    /// MVP は中央前方に固定アンカーを置く（平面タップ配置は `scene.placeBoardAnchor` を利用）。
-    func placeBoardAndStart() {
-        // 既存アンカーを除去してから再配置（リトライ時のゴーストアンカー累積防止）。
-        if let existing = boardAnchor {
-            scene.arView.scene.removeAnchor(existing)
-        }
+    /// タップした画面座標を水平面へ raycast 投影し、その点に盤面を固定してプレイ開始する（R2-1, R8-1）。
+    /// 平面が取れなければ何もせず false を返す（配置ガイドで誘導, R1-4）。
+    @discardableResult
+    func placeBoard(atScreenPoint point: CGPoint) -> Bool {
+        guard let anchor = scene.placeBoardAnchor(atScreenPoint: point) else { return false }
+        installBoard(on: anchor)
+        return true
+    }
+
+    #if targetEnvironment(simulator)
+    /// シミュレータ用: 平面が無いためカメラ前方に固定配置してプレイ開始する。
+    func placeBoardForSimulator() {
+        if let existing = boardAnchor { scene.arView.scene.removeAnchor(existing) }
         let anchor = AnchorEntity(world: SIMD3<Float>(0, -0.1, -0.5))
         scene.arView.scene.addAnchor(anchor)
+        installBoard(on: anchor)
+    }
+    #endif
+
+    /// アンカーに盤面を組んでプレイ開始する共通処理。
+    private func installBoard(on anchor: AnchorEntity) {
+        if let existing = boardAnchor, existing !== anchor {
+            scene.arView.scene.removeAnchor(existing)
+        }
         boardAnchor = anchor
         cardManager.attach(to: anchor)
         cardManager.buildBoard(config: config)
@@ -91,9 +114,13 @@ final class GameEngine: ObservableObject {
         startTimer()
     }
 
-    /// 結果画面からのリトライ（初期状態へ, R8-4）。盤面再構築は次の `placeBoardAndStart()` で行う。
+    /// リトライ／中断やり直し（初期状態＝配置画面へ, R8-4）。盤面を撤去し、次のタップ配置で組み直す。
     func retry() {
         timer?.cancel()
+        if let existing = boardAnchor {
+            scene.arView.scene.removeAnchor(existing)
+            boardAnchor = nil
+        }
         gameState.retry()
     }
 
