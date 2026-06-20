@@ -29,6 +29,7 @@ final class GameSession: ARFrameConsuming {
     private let cardManager: CardManaging
     private let matchEvaluator: MatchEvaluator
     private let gameState: GameStateManager
+    private let feedback: FeedbackController?
     private let interfaceOrientationProvider: () -> UIInterfaceOrientation
     private let dispatcher: Dispatching
 
@@ -44,6 +45,7 @@ final class GameSession: ARFrameConsuming {
         cardManager: CardManaging,
         matchEvaluator: MatchEvaluator,
         gameState: GameStateManager,
+        feedback: FeedbackController? = nil,
         interfaceOrientationProvider: @escaping () -> UIInterfaceOrientation = { .portrait },
         dispatcher: Dispatching = MainDispatcher()
     ) {
@@ -56,6 +58,7 @@ final class GameSession: ARFrameConsuming {
         self.cardManager = cardManager
         self.matchEvaluator = matchEvaluator
         self.gameState = gameState
+        self.feedback = feedback
         self.interfaceOrientationProvider = interfaceOrientationProvider
         self.dispatcher = dispatcher
     }
@@ -99,6 +102,7 @@ final class GameSession: ARFrameConsuming {
         gameState.recordPower(power)
         guard let world = projector.worldPoint(fromScreen: punch.screenPoint) else { return }
         shockwave.emit(at: world, power: power)
+        feedback?.playPunch(power: power)
         settleObserver.onShockEmitted()
     }
 
@@ -110,5 +114,6 @@ final class GameSession: ARFrameConsuming {
         }
         cardManager.collect(pairs.flatMap { $0 })
         gameState.onPairsMatched(pairs.count, remainingPairs: cardManager.remainingPairs)
+        feedback?.playPairMatched()
     }
 }

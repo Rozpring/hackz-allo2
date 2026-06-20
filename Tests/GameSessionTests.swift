@@ -80,7 +80,7 @@ final class GameSessionTests: XCTestCase {
             dispatcher: SyncDispatcher()
         )
         session.start()
-        game.startPlaying()
+        game.startPlaying(totalPairs: cardManager.remainingPairs)
 
         feedPunch(provider)
 
@@ -138,7 +138,7 @@ final class GameSessionTests: XCTestCase {
             dispatcher: SyncDispatcher()
         )
         session.start()
-        game.startPlaying()
+        game.startPlaying(totalPairs: cardManager.remainingPairs)
         let initialPairs = cardManager.remainingPairs
 
         // 同一ランクの2枚を表向き姿勢にする（物理結果のシミュレート）

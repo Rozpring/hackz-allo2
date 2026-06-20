@@ -3,12 +3,6 @@ import Combine
 import RealityKit
 import ARKit
 
-/// Vision 実装（#20）が入るまでの無入力手検出プロバイダ。アプリ全体のグラフを成立させるためのプレースホルダ。
-final class IdleHandProvider: HandLandmarkProvider {
-    var samples: AnyPublisher<HandSample, Never> { Empty().eraseToAnyPublisher() }
-    func process(frame: ARFrame, interfaceOrientation: UIInterfaceOrientation) {}
-}
-
 /// アプリのオブジェクトグラフ（AR・カード・物理・ゲーム状態・結線）を束ねるライフサイクル管理（#31, #32）。
 /// 画面遷移は `gameState.phase` の変化を公開し、`AppCoordinator` が購読する。
 final class GameEngine: ObservableObject {
@@ -20,6 +14,7 @@ final class GameEngine: ObservableObject {
     private let settleObserver: PhysicsSettleObserver
     private let swingDetector: HandSwingDetector
     private let handProvider: HandLandmarkProvider
+    private let feedback: FeedbackController
     private let session: GameSession
 
     private var cancellables: Set<AnyCancellable> = []
@@ -27,6 +22,11 @@ final class GameEngine: ObservableObject {
     private var boardAnchor: AnchorEntity?
 
     @Published private(set) var phase: GamePhase = .placing
+    /// 手検出の有無（HUD の補助ガイド表示に使う, 要件 9.4）。
+    @Published private(set) var isHandDetected: Bool = false
+
+    /// クリア時の経過秒数（結果画面に渡す）。
+    var elapsedSeconds: Int { config.timeLimitSeconds - gameState.remainingSeconds }
 
     init(config: GameConfig = .default) {
         self.config = config
@@ -35,7 +35,8 @@ final class GameEngine: ObservableObject {
         let gameState = GameStateManager(config: config)
         let settleObserver = PhysicsSettleObserver(cardManager: cardManager, config: config)
         let swingDetector = HandSwingDetector(config: config)
-        let handProvider = IdleHandProvider()
+        let handProvider = VisionHandProvider()
+        let feedback = FeedbackController()
         let session = GameSession(
             handProvider: handProvider,
             swingDetector: swingDetector,
@@ -45,7 +46,8 @@ final class GameEngine: ObservableObject {
             settleObserver: settleObserver,
             cardManager: cardManager,
             matchEvaluator: MatchEvaluator(),
-            gameState: gameState
+            gameState: gameState,
+            feedback: feedback
         )
 
         self.scene = scene
@@ -54,6 +56,7 @@ final class GameEngine: ObservableObject {
         self.settleObserver = settleObserver
         self.swingDetector = swingDetector
         self.handProvider = handProvider
+        self.feedback = feedback
         self.session = session
 
         // カメラ1フィードを手検出＋静止監視へ分配（#30）。
@@ -63,6 +66,12 @@ final class GameEngine: ObservableObject {
         gameState.$phase
             .receive(on: RunLoop.main)
             .sink { [weak self] in self?.phase = $0 }
+            .store(in: &cancellables)
+
+        // 手検出の有無を HUD ガイド用に反映（要件 9.4）。
+        handProvider.samples
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.isHandDetected = true }
             .store(in: &cancellables)
     }
 
@@ -78,7 +87,7 @@ final class GameEngine: ObservableObject {
         boardAnchor = anchor
         cardManager.attach(to: anchor)
         cardManager.buildBoard(config: config)
-        gameState.startPlaying()
+        gameState.startPlaying(totalPairs: cardManager.remainingPairs)
         startTimer()
     }
 
